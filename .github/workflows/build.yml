@@ -1,0 +1,123 @@
+name: .NET 8 MVC CI/CD with Sonar, Trivy, CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore Todo.csproj # Thay Todo.csproj bằng tên project của bạn
+
+    - name: Build
+      run: dotnet build --no-restore Todo.csproj -c Release # Thay Todo.csproj bằng tên project của bạn
+
+    - name: Test
+      run: dotnet test --no-build Todo.csproj -c Release --verbosity normal # Thay Todo.csproj bằng tên project của bạn
+
+  sonar:
+      name: SonarQube/SonarCloud Analysis
+      needs: build
+      runs-on: windows-latest
+      steps:
+        - name: Set up JDK 17
+          uses: actions/setup-java@v4
+          with:
+            java-version: 17
+            distribution: 'zulu' # Alternative distribution options are available.
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+        - name: Cache SonarQube Cloud packages
+          uses: actions/cache@v4
+          with:
+            path: ~\sonar\cache
+            key: ${{ runner.os }}-sonar
+            restore-keys: ${{ runner.os }}-sonar
+        - name: Cache SonarQube Cloud scanner
+          id: cache-sonar-scanner
+          uses: actions/cache@v4
+          with:
+            path: .\.sonar\scanner
+            key: ${{ runner.os }}-sonar-scanner
+            restore-keys: ${{ runner.os }}-sonar-scanner
+        - name: Install SonarQube Cloud scanner
+          if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+          shell: powershell
+          run: |
+            New-Item -Path .\.sonar\scanner -ItemType Directory
+            dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
+        - name: Build and analyze
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          shell: powershell
+          run: |
+            .\.sonar\scanner\dotnet-sonarscanner begin /k:"xuanphongit_PhongCoreMVC" /o:"xuanphongit" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io"
+            dotnet build
+            .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+  trivy:
+    name: Trivy Vulnerability Scan
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-transport-https ca-certificates gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy -y
+
+      - name: Run Trivy scan (filesystem)
+        run: trivy fs --severity HIGH,CRITICAL --exit-code 1 . # Quét toàn bộ filesystem, exit với code 1 nếu có lỗi mức độ cao hoặc nghiêm trọng
+
+      # Nếu bạn có Dockerfile và build image:
+      # - name: Build Docker image
+      #   run: docker build -t todo-app .
+      #
+      # - name: Run Trivy scan (image)
+      #   run: trivy image --severity HIGH,CRITICAL --exit-code 1 todo-app
+
+  codeql:
+    name: CodeQL Analysis
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # Recommended to fetch all history for better results
+
+    # Initializes the CodeQL tools for scanning the repository
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: csharp
+
+    # Builds your code using the previously built artifacts
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+
+    # Performs CodeQL analysis on the code base
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
