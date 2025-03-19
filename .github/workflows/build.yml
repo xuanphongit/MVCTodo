@@ -88,13 +88,6 @@ jobs:
       - name: Run Trivy scan (filesystem)
         run: trivy fs --severity HIGH,CRITICAL --exit-code 1 . # Quét toàn bộ filesystem, exit với code 1 nếu có lỗi mức độ cao hoặc nghiêm trọng
 
-      # Nếu bạn có Dockerfile và build image:
-      # - name: Build Docker image
-      #   run: docker build -t todo-app .
-      #
-      # - name: Run Trivy scan (image)
-      #   run: trivy image --severity HIGH,CRITICAL --exit-code 1 todo-app
-
   codeql:
     name: CodeQL Analysis
     needs: build
