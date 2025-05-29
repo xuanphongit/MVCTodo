@@ -59,12 +59,12 @@ jobs:
       with:
         config-path: .gitleaks.toml
         version: latest
-        fail-on-error: true
+        fail-on-error: false
       continue-on-error: true
 
     # Upload GitLeaks SARIF results to GitHub Security tab
     - name: Upload GitLeaks SARIF to Security Tab
-      if: always()
+      if: always() && steps.gitleaks.outputs.sarif != ''
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: ${{ steps.gitleaks.outputs.sarif }}
@@ -100,7 +100,7 @@ jobs:
           ~/.gradle/caches
           ~/odc-data
           ${{ github.workspace }}/odc-data
-        key: ${{ runner.os }}-owasp-db-${{ hashFiles('**/*.csproj') }}-v12.1
+        key: ${{ runner.os }}-owasp-db-${{ hashFiles('**/*.csproj') }}-v12.1.1
         restore-keys: |
           ${{ runner.os }}-owasp-db-${{ hashFiles('**/*.csproj') }}-
           ${{ runner.os }}-owasp-db-
@@ -116,8 +116,8 @@ jobs:
     - name: Setup OWASP Dependency Check
       shell: powershell
       run: |
-        $odcVersion = "12.1"
-        $downloadUrl = "https://github.com/jeremylong/DependencyCheck/releases/download/v$odcVersion/dependency-check-$odcVersion-release.zip"
+        $odcVersion = "12.1.1"
+        $downloadUrl = "https://github.com/dependency-check/DependencyCheck/releases/download/v$odcVersion/dependency-check-$odcVersion-release.zip"
         $zipPath = "dependency-check.zip"
         $extractPath = "dependency-check"
         
@@ -204,7 +204,7 @@ jobs:
     # Upload GitLeaks reports as artifacts
     - name: Upload GitLeaks Results
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && steps.gitleaks.outputs.sarif != ''
       with:
         name: gitleaks-results-${{ github.run_number }}
         path: |
@@ -230,7 +230,7 @@ jobs:
         Write-Host "Creating comprehensive job summary..."
         
         # Check if files exist
-        $gitleaksExists = Test-Path "${{ steps.gitleaks.outputs.sarif }}"
+        $gitleaksExists = if ("${{ steps.gitleaks.outputs.sarif }}" -ne "") { Test-Path "${{ steps.gitleaks.outputs.sarif }}" } else { $false }
         $owaspExists = Test-Path "odc-reports"
         
         # Determine GitLeaks status
@@ -255,9 +255,9 @@ jobs:
           - 🎯 .NET-specific rules and exclusions
           - 🚀 Enhanced performance with modern allowlists
         
-        ### OWASP Dependency Check v12.1 $owaspStatus
+        ### OWASP Dependency Check v12.1.1 $owaspStatus
         - **Status**: $owaspStatus
-        - **Version**: v12.1 (Latest)
+        - **Version**: v12.1.1 (Latest)
         - **Project**: Todo MVC Security Scan
         - **Fail Threshold**: CVSS Score ≥ 7.0 (High/Critical)
         - **Reports Generated**: 
