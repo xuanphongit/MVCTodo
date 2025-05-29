@@ -63,26 +63,12 @@ jobs:
         category: gitleaks
       continue-on-error: true
 
-    # Setup .NET for project analysis
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    # Setup Java for OWASP Dependency Check
+    - name: Setup Java
+      uses: actions/setup-java@v4
       with:
-        dotnet-version: '8.0.x'
-
-    # Cache NuGet packages
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.nuget/packages
-          ${{ github.workspace }}/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    # Restore .NET dependencies
-    - name: Restore dependencies
-      run: dotnet restore Todo.csproj
+        distribution: 'temurin'
+        java-version: '11'
 
     # Cache OWASP Dependency Check database and NVD data
     - name: Cache OWASP Dependency Check Database
@@ -114,13 +100,6 @@ jobs:
           ${{ runner.os }}-nvd-database-
           ${{ runner.os }}-owasp-nvd-db-
           ${{ runner.os }}-owasp-db-
-
-    # Setup Java for OWASP Dependency Check
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '11'
 
     # Download and setup OWASP Dependency Check
     - name: Setup OWASP Dependency Check
