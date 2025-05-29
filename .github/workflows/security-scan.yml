@@ -92,7 +92,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore Todo.csproj
 
-    # Cache OWASP Dependency Check database
+    # Cache OWASP Dependency Check database and NVD data
     - name: Cache OWASP Dependency Check Database
       uses: actions/cache@v4
       with:
@@ -100,9 +100,27 @@ jobs:
           ~/.gradle/caches
           ~/odc-data
           ${{ github.workspace }}/odc-data
-        key: ${{ runner.os }}-owasp-db-${{ hashFiles('**/*.csproj') }}-v12.1.1
+          ${{ runner.temp }}/odc-data
+          %USERPROFILE%/odc-data
+        key: ${{ runner.os }}-owasp-nvd-db-${{ github.run_number }}-${{ github.sha }}
         restore-keys: |
-          ${{ runner.os }}-owasp-db-${{ hashFiles('**/*.csproj') }}-
+          ${{ runner.os }}-owasp-nvd-db-${{ github.run_number }}-
+          ${{ runner.os }}-owasp-nvd-db-
+          ${{ runner.os }}-owasp-db-
+
+    # Restore NVD database cache specifically
+    - name: Restore NVD Database Cache
+      uses: actions/cache/restore@v4
+      id: nvd-cache
+      with:
+        path: |
+          ~/odc-data
+          ${{ github.workspace }}/odc-data
+          %USERPROFILE%/odc-data
+        key: ${{ runner.os }}-nvd-database-${{ github.run_number }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-nvd-database-
+          ${{ runner.os }}-owasp-nvd-db-
           ${{ runner.os }}-owasp-db-
 
     # Setup Java for OWASP Dependency Check
@@ -147,6 +165,8 @@ jobs:
     # Run OWASP Dependency Check
     - name: Run OWASP Dependency Check
       shell: powershell
+      env:
+        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
         $dataDir = Join-Path $env:USERPROFILE "odc-data"
         $reportDir = "odc-reports"
@@ -165,31 +185,71 @@ jobs:
         Write-Host "[INFO] Project: Todo MVC Security Scan"
         Write-Host "[INFO] CVSS Threshold: >= 7.0 (High/Critical)"
         
+        # Show cache status
+        Write-Host "[INFO] Cache Status: ${{ steps.nvd-cache.outputs.cache-hit == 'true' && 'HIT - Using cached NVD data' || 'MISS - Will download NVD data' }}"
+        
+        # Check cache content
+        $cacheFiles = Get-ChildItem -Path $dataDir -Recurse -File -ErrorAction SilentlyContinue
+        if ($cacheFiles.Count -gt 0) {
+          $cacheSizeMB = [math]::Round(($cacheFiles | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+          Write-Host "[INFO] Found $($cacheFiles.Count) cached NVD files ($cacheSizeMB MB)"
+        } else {
+          Write-Host "[INFO] No cached NVD data found - fresh download required"
+        }
+        
+        # Check if NVD API key is available
+        if ($env:NVD_API_KEY) {
+          Write-Host "[SUCCESS] NVD API Key detected - faster updates enabled"
+        } else {
+          Write-Host "[WARNING] No NVD API Key found - updates will be slower"
+        }
+        
         try {
-          & dependency-check.bat `
-            --project "Todo MVC Security Scan" `
-            --scan "." `
-            --format "ALL" `
-            --out $reportDir `
-            --data $dataDir `
-            --enableRetired `
-            --enableExperimental `
-            --failOnCVSS 7 `
-            --exclude "**\bin\**" `
-            --exclude "**\obj\**" `
-            --exclude "**\.git\**" `
-            --exclude "**\.vs\**" `
-            --exclude "**\node_modules\**" `
-            --exclude "**\packages\**" `
-            --exclude "**\.nuget\**" `
-            --exclude "**\TestResults\**"
-            
+          # Build the command with conditional NVD API key
+          $dependencyCheckArgs = @(
+            "--project", "Todo MVC Security Scan",
+            "--scan", ".",
+            "--format", "ALL",
+            "--out", $reportDir,
+            "--data", $dataDir,
+            "--enableRetired",
+            "--enableExperimental",
+            "--failOnCVSS", "7",
+            "--exclude", "**\bin\**",
+            "--exclude", "**\obj\**",
+            "--exclude", "**\.git\**",
+            "--exclude", "**\.vs\**",
+            "--exclude", "**\node_modules\**",
+            "--exclude", "**\packages\**",
+            "--exclude", "**\.nuget\**",
+            "--exclude", "**\TestResults\**"
+          )
+          
+          # Add NVD API key if available
+          if ($env:NVD_API_KEY) {
+            $dependencyCheckArgs += "--nvdApiKey"
+            $dependencyCheckArgs += $env:NVD_API_KEY
+          }
+          
+          & dependency-check.bat @dependencyCheckArgs
+          
           Write-Host "[SUCCESS] OWASP Dependency Check completed successfully"
         } catch {
           Write-Host "[ERROR] OWASP Dependency Check failed or found high-severity vulnerabilities"
           Write-Host "[INFO] Check the reports for detailed vulnerability information"
           # Don't exit here - let the workflow continue to upload reports
         }
+
+    # Save NVD cache data for future runs
+    - name: Save NVD Cache Data
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ~/odc-data
+          ${{ github.workspace }}/odc-data
+          %USERPROFILE%/odc-data
+        key: ${{ runner.os }}-nvd-database-${{ github.run_number }}-${{ github.sha }}
 
     # Upload OWASP reports as artifacts
     - name: Upload OWASP Dependency Check Results
@@ -260,6 +320,7 @@ jobs:
         - **Version**: v12.1.1 (Latest)
         - **Project**: Todo MVC Security Scan
         - **Fail Threshold**: CVSS Score >= 7.0 (High/Critical)
+        - **NVD API**: ${{ secrets.NVD_API_KEY && 'Enabled (Fast Updates)' || 'Not configured (Slow Updates)' }}
         - **Reports Generated**: 
           - HTML Report (human-readable)
           - JSON Report (machine-readable)

@@ -40,25 +40,25 @@ stopwords = [
     "dummy",
 ]
 
-# Fix: Use proper glob patterns that don't conflict with regex syntax
+# Use proper regex patterns for path exclusions in v8.26.0
 paths = [
-    # Exclude common .NET build and package directories - use single * for glob patterns
-    '''*/.vs/*''',
-    '''*/bin/*''',
-    '''*/obj/*''',
-    '''*/packages/*''',
-    '''*/.nuget/*''',
-    '''*/TestResults/*''',
+    # Exclude common .NET build and package directories - use regex patterns
+    '''.*\.vs.*''',
+    '''.*\\bin\\.*''',
+    '''.*\\obj\\.*''',
+    '''.*\\packages\\.*''',
+    '''.*\.nuget.*''',
+    '''.*\\TestResults\\.*''',
     
     # Exclude package files
-    '''*.nupkg''',
-    '''*.snupkg''',
+    '''.*\.nupkg$''',
+    '''.*\.snupkg$''',
     
     # Exclude common IDE and temp files
-    '''*.tmp''',
-    '''*.temp''',
-    '''*/.vscode/*''',
-    '''*/.idea/*''',
+    '''.*\.tmp$''',
+    '''.*\.temp$''',
+    '''.*\.vscode.*''',
+    '''.*\.idea.*''',
 ]
 
 # Custom rules for .NET specific secrets
@@ -168,9 +168,9 @@ description = "Secrets in appsettings files"
 regex = '''(?i)(password|secret|key|token)\s*[:=]\s*["\'][^"\']{8,}["\']'''
 keywords = ["password", "secret", "key", "token"]
 paths = [
-    '''*appsettings*.json''',
-    '''*web.config''',
-    '''*app.config''',
+    '''.*appsettings.*\.json$''',
+    '''.*web\.config$''',
+    '''.*app\.config$''',
 ]
 
     # Allow common configuration examples
