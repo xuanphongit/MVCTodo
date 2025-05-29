@@ -40,24 +40,25 @@ stopwords = [
     "dummy",
 ]
 
+# Fix: Use proper glob patterns that don't conflict with regex syntax
 paths = [
-    # Exclude common .NET build and package directories
-    '''**/.vs/**''',
-    '''**/bin/**''',
-    '''**/obj/**''',
-    '''**/packages/**''',
-    '''**/.nuget/**''',
-    '''**/TestResults/**''',
+    # Exclude common .NET build and package directories - use single * for glob patterns
+    '''*/.vs/*''',
+    '''*/bin/*''',
+    '''*/obj/*''',
+    '''*/packages/*''',
+    '''*/.nuget/*''',
+    '''*/TestResults/*''',
     
     # Exclude package files
-    '''**/*.nupkg''',
-    '''**/*.snupkg''',
+    '''*.nupkg''',
+    '''*.snupkg''',
     
     # Exclude common IDE and temp files
-    '''**/*.tmp''',
-    '''**/*.temp''',
-    '''**/.vscode/**''',
-    '''**/.idea/**''',
+    '''*.tmp''',
+    '''*.temp''',
+    '''*/.vscode/*''',
+    '''*/.idea/*''',
 ]
 
 # Custom rules for .NET specific secrets
@@ -70,7 +71,6 @@ keywords = ["server=", "data source=", "user id=", "password=", "pwd="]
     # Rule-specific allowlist to reduce false positives
     [[rules.allowlists]]
     description = "Allow test connection strings"
-    condition = "OR"
     regexTarget = "match"
     regexes = [
         '''(?i)test.*connection''',
@@ -99,7 +99,6 @@ keywords = ["apikey", "api_key", "api-key"]
     # Allow test API keys
     [[rules.allowlists]]
     description = "Allow test API keys"
-    condition = "OR"
     stopwords = ["test", "example", "demo", "fake"]
 
 [[rules]]
@@ -117,7 +116,6 @@ keywords = ["jwt", "token", "bearer"]
     # Allow test JWT tokens
     [[rules.allowlists]]
     description = "Allow test JWT tokens"
-    condition = "OR"
     regexTarget = "line"
     regexes = [
         '''(?i)//.*jwt''',
@@ -158,7 +156,6 @@ keywords = ["twilio", "auth_token", "AuthToken"]
     # Avoid false positives with generic hex strings
     [[rules.allowlists]]
     description = "Avoid generic hex strings that aren't Twilio tokens"
-    condition = "AND"
     regexTarget = "line"
     regexes = [
         '''(?i)twilio''',
@@ -171,15 +168,14 @@ description = "Secrets in appsettings files"
 regex = '''(?i)(password|secret|key|token)\s*[:=]\s*["\'][^"\']{8,}["\']'''
 keywords = ["password", "secret", "key", "token"]
 paths = [
-    '''**/appsettings*.json''',
-    '''**/web.config''',
-    '''**/app.config''',
+    '''*appsettings*.json''',
+    '''*web.config''',
+    '''*app.config''',
 ]
 
     # Allow common configuration examples
     [[rules.allowlists]]
     description = "Allow configuration examples and templates"
-    condition = "OR"
     regexTarget = "match"
     regexes = [
         '''(?i)your[_-]?(password|secret|key)''',
@@ -191,7 +187,6 @@ paths = [
 # Enhanced allowlist for .NET specific patterns
 [[allowlists]]
 description = "Enhanced .NET Framework allowlist"
-condition = "OR"
 regexTarget = "line"
 regexes = [
     # Allow .NET framework references in comments
@@ -211,7 +206,6 @@ regexes = [
 # Performance and entropy settings
 [[allowlists]]
 description = "Performance optimization - exclude overly generic patterns"
-condition = "OR"
 regexTarget = "secret"
 regexes = [
     # Exclude very short potential secrets that are likely false positives
@@ -220,9 +214,4 @@ regexes = [
     '''^\*+$''',
     '''^x+$''',
     '''^X+$''',
-]
-
-# Entropy-based filtering for better accuracy
-# Note: Entropy settings help balance detection vs false positives
-# min = 3.5 ensures we don't flag common words
-# max = 8.0 prevents flagging completely random data 
+] 

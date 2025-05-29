@@ -124,25 +124,25 @@ jobs:
         Write-Host "Downloading OWASP Dependency Check v$odcVersion..."
         try {
           Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -ErrorAction Stop
-          Write-Host "✅ Download completed successfully"
+          Write-Host "[SUCCESS] Download completed successfully"
         } catch {
-          Write-Error "❌ Failed to download OWASP Dependency Check: $_"
+          Write-Error "[ERROR] Failed to download OWASP Dependency Check: $_"
           exit 1
         }
         
         Write-Host "Extracting OWASP Dependency Check..."
         try {
           Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
-          Write-Host "✅ Extraction completed successfully"
+          Write-Host "[SUCCESS] Extraction completed successfully"
         } catch {
-          Write-Error "❌ Failed to extract OWASP Dependency Check: $_"
+          Write-Error "[ERROR] Failed to extract OWASP Dependency Check: $_"
           exit 1
         }
         
         # Add to PATH
         $odcPath = Join-Path $PWD "dependency-check\dependency-check\bin"
         echo $odcPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        Write-Host "✅ Added OWASP Dependency Check to PATH: $odcPath"
+        Write-Host "[SUCCESS] Added OWASP Dependency Check to PATH: $odcPath"
 
     # Run OWASP Dependency Check
     - name: Run OWASP Dependency Check
@@ -154,16 +154,16 @@ jobs:
         # Create directories if they don't exist
         if (!(Test-Path $dataDir)) { 
           New-Item -ItemType Directory -Path $dataDir -Force 
-          Write-Host "✅ Created data directory: $dataDir"
+          Write-Host "[SUCCESS] Created data directory: $dataDir"
         }
         if (!(Test-Path $reportDir)) { 
           New-Item -ItemType Directory -Path $reportDir -Force 
-          Write-Host "✅ Created report directory: $reportDir"
+          Write-Host "[SUCCESS] Created report directory: $reportDir"
         }
         
-        Write-Host "🔍 Starting OWASP Dependency Check scan..."
-        Write-Host "📊 Project: Todo MVC Security Scan"
-        Write-Host "🎯 CVSS Threshold: ≥ 7.0 (High/Critical)"
+        Write-Host "[INFO] Starting OWASP Dependency Check scan..."
+        Write-Host "[INFO] Project: Todo MVC Security Scan"
+        Write-Host "[INFO] CVSS Threshold: >= 7.0 (High/Critical)"
         
         try {
           & dependency-check.bat `
@@ -184,10 +184,10 @@ jobs:
             --exclude "**\.nuget\**" `
             --exclude "**\TestResults\**"
             
-          Write-Host "✅ OWASP Dependency Check completed successfully"
+          Write-Host "[SUCCESS] OWASP Dependency Check completed successfully"
         } catch {
-          Write-Host "❌ OWASP Dependency Check failed or found high-severity vulnerabilities"
-          Write-Host "🔍 Check the reports for detailed vulnerability information"
+          Write-Host "[ERROR] OWASP Dependency Check failed or found high-severity vulnerabilities"
+          Write-Host "[INFO] Check the reports for detailed vulnerability information"
           # Don't exit here - let the workflow continue to upload reports
         }
 
@@ -234,15 +234,15 @@ jobs:
         $owaspExists = Test-Path "odc-reports"
         
         # Determine GitLeaks status
-        $gitleaksStatus = if ($gitleaksExists) { "✅ Completed" } else { "⚠️ No results" }
-        $owaspStatus = if ($owaspExists) { "✅ Completed" } else { "❌ Failed" }
+        $gitleaksStatus = if ($gitleaksExists) { "[SUCCESS] Completed" } else { "[WARNING] No results" }
+        $owaspStatus = if ($owaspExists) { "[SUCCESS] Completed" } else { "[ERROR] Failed" }
         
         # Get decode depth from inputs
         $decodeDepth = "${{ github.event.inputs.max_decode_depth || '2' }}"
         $verboseMode = "${{ github.event.inputs.enable_verbose || 'false' }}"
         
         $summary = @"
-        ## 🔒 Security Scan Results - Run #${{ github.run_number }}
+        ## Security Scan Results - Run #${{ github.run_number }}
         
         ### GitLeaks v8.26.0 Secret Scanning $gitleaksStatus
         - **Status**: $gitleaksStatus
@@ -250,51 +250,51 @@ jobs:
         - **Action**: gacts/gitleaks@v1 (Windows-compatible, no license required)
         - **Configuration**: .NET-optimized with stopwords for performance
         - **Features**: 
-          - 🔍 Advanced pattern detection with v8.26.0 syntax
-          - 📋 SARIF report generated for Security tab
-          - 🎯 .NET-specific rules and exclusions
-          - 🚀 Enhanced performance with modern allowlists
+          - Advanced pattern detection with v8.26.0 syntax
+          - SARIF report generated for Security tab
+          - .NET-specific rules and exclusions
+          - Enhanced performance with modern allowlists
         
         ### OWASP Dependency Check v12.1.1 $owaspStatus
         - **Status**: $owaspStatus
         - **Version**: v12.1.1 (Latest)
         - **Project**: Todo MVC Security Scan
-        - **Fail Threshold**: CVSS Score ≥ 7.0 (High/Critical)
+        - **Fail Threshold**: CVSS Score >= 7.0 (High/Critical)
         - **Reports Generated**: 
-          - 📄 HTML Report (human-readable)
-          - 📊 JSON Report (machine-readable)
-          - 📋 XML Report (integration)
-          - 🔒 SARIF Report (uploaded to Security tab)
+          - HTML Report (human-readable)
+          - JSON Report (machine-readable)
+          - XML Report (integration)
+          - SARIF Report (uploaded to Security tab)
         
-        ### 📊 View Results
-        - 🔒 **Security Tab**: Navigate to Security → Code scanning alerts
-        - 📁 **Artifacts**: Download scan results from this workflow run
-        - 📝 **GitLeaks Logs**: Review secret detection details in workflow logs
-        - 📈 **OWASP Reports**: Download detailed vulnerability reports
+        ### View Results
+        - **Security Tab**: Navigate to Security -> Code scanning alerts
+        - **Artifacts**: Download scan results from this workflow run
+        - **GitLeaks Logs**: Review secret detection details in workflow logs
+        - **OWASP Reports**: Download detailed vulnerability reports
         
-        ### 🎮 Workflow Controls
+        ### Workflow Controls
         - **Manual Trigger**: Use 'Run workflow' button for custom scans
         - **Configuration**: Custom .gitleaks.toml with .NET optimizations
         - **Scheduling**: Automatic weekly scans on Sundays
         
-        ### 🔧 Next Steps
+        ### Next Steps
         If vulnerabilities or secrets are found:
-        1. 🔍 Review the detailed reports in Security tab
-        2. 📥 Download artifacts for offline analysis
-        3. 🔄 Update vulnerable dependencies immediately
-        4. 🔐 Rotate any exposed secrets
-        5. 🛡️ Apply security patches
-        6. ♻️ Re-run the security scan to verify fixes
+        1. Review the detailed reports in Security tab
+        2. Download artifacts for offline analysis
+        3. Update vulnerable dependencies immediately
+        4. Rotate any exposed secrets
+        5. Apply security patches
+        6. Re-run the security scan to verify fixes
         
-        ### 📋 Configuration
-        - **GitLeaks Config**: `.gitleaks.toml` (v8.26.0 syntax)
+        ### Configuration
+        - **GitLeaks Config**: .gitleaks.toml (v8.26.0 syntax)
         - **OWASP Exclusions**: Build artifacts, packages, IDE files
         - **Caching**: Enabled for faster subsequent runs
         - **Retention**: Artifacts kept for 30 days
         "@
         
         echo $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
-        Write-Host "✅ Job summary created successfully"
+        Write-Host "[SUCCESS] Job summary created successfully"
 
   # Enhanced vulnerability notification with more details
   notify-on-vulnerabilities:
