@@ -1,0 +1,228 @@
+title = "GitLeaks Configuration for .NET Applications"
+
+# Extend the default gitleaks config to get baseline rules
+[extend]
+path = "https://raw.githubusercontent.com/gitleaks/gitleaks/master/config/gitleaks.toml"
+
+# Global allowlists for common .NET patterns that are not secrets
+# ⚠️ Updated from [allowlist] to [[allowlists]] as per v8.25.0+
+[[allowlists]]
+description = "Global allowlist for .NET applications"
+regexTarget = "match"
+regexes = [
+    # .NET Framework/Core version numbers
+    '''net\d+\.\d+''',
+    '''netstandard\d+\.\d+''',
+    '''netcoreapp\d+\.\d+''',
+    '''netframework\d+\.\d+''',
+    
+    # Common .NET GUIDs and tokens that are not secrets
+    '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''', # Standard GUID format in comments/docs
+    
+    # Package version numbers
+    '''Version=\d+\.\d+\.\d+''',
+    '''version:\s*\d+\.\d+\.\d+''',
+    
+    # .NET specific non-secrets
+    '''PublicKeyToken=null''',
+    '''PublicKeyToken=[0-9a-f]{16}''',
+    '''Culture=neutral''',
+]
+
+stopwords = [
+    # Common test/example data - using stopwords instead of regex for better performance
+    "test",
+    "example", 
+    "demo",
+    "sample",
+    "fake",
+    "mock",
+    "dummy",
+]
+
+paths = [
+    # Exclude common .NET build and package directories
+    '''**/.vs/**''',
+    '''**/bin/**''',
+    '''**/obj/**''',
+    '''**/packages/**''',
+    '''**/.nuget/**''',
+    '''**/TestResults/**''',
+    
+    # Exclude package files
+    '''**/*.nupkg''',
+    '''**/*.snupkg''',
+    
+    # Exclude common IDE and temp files
+    '''**/*.tmp''',
+    '''**/*.temp''',
+    '''**/.vscode/**''',
+    '''**/.idea/**''',
+]
+
+# Custom rules for .NET specific secrets
+[[rules]]
+id = "dotnet-connection-string"
+description = "Detects .NET connection strings with embedded credentials"
+regex = '''(?i)(server|data source|host)=.*(user id|uid|username)=.*(password|pwd)=[\w@#$%^&*()]+'''
+keywords = ["server=", "data source=", "user id=", "password=", "pwd="]
+
+    # Rule-specific allowlist to reduce false positives
+    [[rules.allowlists]]
+    description = "Allow test connection strings"
+    condition = "OR"
+    regexTarget = "match"
+    regexes = [
+        '''(?i)test.*connection''',
+        '''(?i)localhost.*test''',
+        '''(?i)example.*server''',
+    ]
+
+[[rules]]
+id = "azure-storage-key"
+description = "Azure Storage Account Key"
+regex = '''[a-zA-Z0-9+/]{88}=='''
+keywords = ["AccountKey", "StorageKey", "DefaultEndpointsProtocol"]
+
+[[rules]]
+id = "azure-function-key"
+description = "Azure Function Key"
+regex = '''[a-zA-Z0-9_-]{52,54}'''
+keywords = ["x-functions-key", "code="]
+
+[[rules]]
+id = "dotnet-api-key"
+description = ".NET Application API Key"
+regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[a-zA-Z0-9]{16,}["\']?'''
+keywords = ["apikey", "api_key", "api-key"]
+
+    # Allow test API keys
+    [[rules.allowlists]]
+    description = "Allow test API keys"
+    condition = "OR"
+    stopwords = ["test", "example", "demo", "fake"]
+
+[[rules]]
+id = "nuget-api-key"
+description = "NuGet API Key"
+regex = '''oy2[a-z0-9]{43}'''
+keywords = ["nuget", "api-key"]
+
+[[rules]]
+id = "jwt-token"
+description = "JWT Token"
+regex = '''eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*'''
+keywords = ["jwt", "token", "bearer"]
+
+    # Allow test JWT tokens
+    [[rules.allowlists]]
+    description = "Allow test JWT tokens"
+    condition = "OR"
+    regexTarget = "line"
+    regexes = [
+        '''(?i)//.*jwt''',
+        '''(?i)/\*.*jwt.*\*/''',
+        '''(?i)test.*jwt''',
+    ]
+
+[[rules]]
+id = "sql-server-connection"
+description = "SQL Server connection string with password"
+regex = '''(?i)(server|data source)=.*password=[\w@#$%^&*()]+'''
+keywords = ["server=", "password=", "integrated security=false"]
+
+[[rules]]
+id = "oauth-client-secret"
+description = "OAuth Client Secret"
+regex = '''(?i)(client[_-]?secret|clientsecret)\s*[:=]\s*["\']?[a-zA-Z0-9_-]{20,}["\']?'''
+keywords = ["client_secret", "clientsecret", "client-secret"]
+
+[[rules]]
+id = "sendgrid-api-key"
+description = "SendGrid API Key"
+regex = '''SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}'''
+keywords = ["sendgrid", "SG."]
+
+[[rules]]
+id = "stripe-api-key"
+description = "Stripe API Key"
+regex = '''sk_live_[a-zA-Z0-9]{24}'''
+keywords = ["stripe", "sk_live_"]
+
+[[rules]]
+id = "twilio-auth-token"
+description = "Twilio Auth Token"
+regex = '''[a-f0-9]{32}'''
+keywords = ["twilio", "auth_token", "AuthToken"]
+
+    # Avoid false positives with generic hex strings
+    [[rules.allowlists]]
+    description = "Avoid generic hex strings that aren't Twilio tokens"
+    condition = "AND"
+    regexTarget = "line"
+    regexes = [
+        '''(?i)twilio''',
+    ]
+
+# File-specific configurations for appsettings and config files
+[[rules]]
+id = "appsettings-secrets"
+description = "Secrets in appsettings files"
+regex = '''(?i)(password|secret|key|token)\s*[:=]\s*["\'][^"\']{8,}["\']'''
+keywords = ["password", "secret", "key", "token"]
+paths = [
+    '''**/appsettings*.json''',
+    '''**/web.config''',
+    '''**/app.config''',
+]
+
+    # Allow common configuration examples
+    [[rules.allowlists]]
+    description = "Allow configuration examples and templates"
+    condition = "OR"
+    regexTarget = "match"
+    regexes = [
+        '''(?i)your[_-]?(password|secret|key)''',
+        '''(?i)(password|secret|key)[_-]?here''',
+        '''(?i)replace[_-]?with''',
+        '''(?i)example[_-]?(password|secret|key)''',
+    ]
+
+# Enhanced allowlist for .NET specific patterns
+[[allowlists]]
+description = "Enhanced .NET Framework allowlist"
+condition = "OR"
+regexTarget = "line"
+regexes = [
+    # Allow .NET framework references in comments
+    '''(?i)//.*\.net\s*(framework|core|standard)''',
+    '''(?i)/\*.*\.net\s*(framework|core|standard).*\*/''',
+    
+    # Allow GUIDs in comments and documentation
+    '''(?i)//.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
+    '''(?i)/\*.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*\*/''',
+    '''<!--.*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*-->''',
+    
+    # Allow test patterns in variable names and comments
+    '''(?i)(test|demo|example|sample)[_-]?(password|secret|key|token)''',
+    '''(?i)(password|secret|key|token)[_-]?(test|demo|example|sample)''',
+]
+
+# Performance and entropy settings
+[[allowlists]]
+description = "Performance optimization - exclude overly generic patterns"
+condition = "OR"
+regexTarget = "secret"
+regexes = [
+    # Exclude very short potential secrets that are likely false positives
+    '''^.{1,7}$''',
+    # Exclude common placeholder patterns
+    '''^\*+$''',
+    '''^x+$''',
+    '''^X+$''',
+]
+
+# Entropy-based filtering for better accuracy
+# Note: Entropy settings help balance detection vs false positives
+# min = 3.5 ensures we don't flag common words
+# max = 8.0 prevents flagging completely random data 

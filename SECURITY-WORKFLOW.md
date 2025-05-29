@@ -6,12 +6,13 @@ This repository includes a comprehensive security scanning workflow using GitHub
 
 ### GitLeaks Secret Scanning
 - **Purpose**: Detects secrets, passwords, API keys, and sensitive information in your repository
+- **Action**: Uses `gacts/gitleaks@v1` (Windows-compatible, no license required)
 - **Scope**: Scans the entire repository history
-- **Action**: Automatically runs on every push and pull request
+- **Advantages**: Works reliably on Windows runners without license requirements
 
 ### OWASP Dependency Check
 - **Purpose**: Identifies known vulnerabilities in project dependencies
-- **Technology**: Uses OWASP Dependency Check v10.0.4
+- **Technology**: Uses OWASP Dependency Check v12.1
 - **Threshold**: Fails on vulnerabilities with CVSS score ≥ 7.0 (high severity)
 - **Caching**: Implements intelligent caching for faster subsequent runs
 
@@ -25,10 +26,9 @@ This repository includes a comprehensive security scanning workflow using GitHub
 ## 🚀 Setup Instructions
 
 ### 1. Repository Secrets (Optional)
-For enhanced GitLeaks functionality, you can add:
-```
-GITLEAKS_LICENSE: Your GitLeaks Pro license (if available)
-```
+No secrets are required for basic functionality. The workflow uses:
+- `GITHUB_TOKEN`: Automatically provided by GitHub Actions
+- No GitLeaks license needed with the `gacts/gitleaks@v1` action
 
 ### 2. Workflow Triggers
 The workflow runs automatically on:
@@ -48,6 +48,7 @@ The workflow requires these permissions (automatically configured):
 - **Location**: Workflow logs under "Run GitLeaks Secret Scan"
 - **Format**: Detailed output showing any detected secrets
 - **Action**: Review and remove any exposed secrets immediately
+- **Configuration**: Optional `.gitleaks.toml` file can be added for custom rules
 
 ### OWASP Dependency Check Results
 - **GitHub Security Tab**: Navigate to Security → Code scanning alerts
@@ -65,6 +66,23 @@ Each workflow run provides a comprehensive summary showing:
 - Next steps for remediation
 
 ## 🛠️ Customization Options
+
+### GitLeaks Configuration
+Create a `.gitleaks.toml` file in your repository root for custom rules:
+```toml
+# Example .gitleaks.toml
+title = "Custom GitLeaks Configuration"
+
+[extend]
+# path to a baseline gitleaks config
+path = "https://raw.githubusercontent.com/gitleaks/gitleaks/master/config/gitleaks.toml"
+
+[[rules]]
+description = "Custom API Key Pattern"
+id = "custom-api-key"
+regex = '''custom-api-[a-zA-Z0-9]{32}'''
+keywords = ["custom-api"]
+```
 
 ### Adjusting CVSS Threshold
 To change the vulnerability severity threshold, modify this line in `.github/workflows/security-scan.yml`:
@@ -92,15 +110,21 @@ The automatic issue creation can be customized by modifying the `notify-on-vulne
 
 ### Common Issues
 
-1. **Workflow Fails on First Run**
-   - OWASP database download may timeout on first run
-   - Re-run the workflow - subsequent runs will be cached and faster
+1. **GitLeaks Action Compatibility**
+   - **Fixed**: Now uses `gacts/gitleaks@v1` which is Windows-compatible
+   - No license key required for individual repositories
+   - Works reliably with Windows runners
 
-2. **Large Repository Scanning**
+2. **OWASP First Run Performance**
+   - OWASP database download may take time on first run
+   - Re-run the workflow - subsequent runs will be cached and faster
+   - Upgraded to v12.1 for better performance and security
+
+3. **Large Repository Scanning**
    - First scan may take 10-15 minutes
    - Cached runs typically complete in 3-5 minutes
 
-3. **False Positives**
+4. **False Positives**
    - Review OWASP reports carefully
    - Some vulnerabilities may not apply to your specific usage
    - Consider suppression files for confirmed false positives
@@ -130,13 +154,26 @@ The workflow works alongside your existing:
 - Trivy vulnerability scanning  
 - CodeQL analysis
 
+## 🆕 Recent Updates
+
+### Version 12.1 Improvements
+- **Updated OWASP Dependency Check**: Now using v12.1 with latest vulnerability database
+- **Enhanced Performance**: Improved scanning speed and accuracy
+- **Better Windows Support**: Optimized for Windows runners
+
+### GitLeaks Action Migration
+- **Switched to `gacts/gitleaks@v1`**: No license requirements, better Windows compatibility
+- **Simplified Configuration**: Removed complex environment variable setup
+- **Optional Config**: Support for custom `.gitleaks.toml` configuration files
+
 ## 📚 Additional Resources
 
 - [OWASP Dependency Check Documentation](https://owasp.org/www-project-dependency-check/)
 - [GitLeaks Documentation](https://github.com/gitleaks/gitleaks)
+- [gacts/gitleaks Action](https://github.com/gacts/gitleaks)
 - [GitHub Security Features](https://docs.github.com/en/code-security)
 - [CVSS Scoring System](https://www.first.org/cvss/)
 
 ---
 
-**Note**: This workflow is specifically optimized for .NET 8 MVC projects running on Windows runners. Modify paths and commands as needed for different project types. 
+**Note**: This workflow is specifically optimized for .NET 8 MVC projects running on Windows runners. The workflow now uses more reliable actions that work consistently across different environments. 
