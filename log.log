@@ -1,0 +1,1242 @@
+2025-05-29T12:51:37.6889664Z Current runner version: '2.324.0'
+2025-05-29T12:51:37.6911654Z ##[group]Operating System
+2025-05-29T12:51:37.6912363Z Microsoft Windows Server 2022
+2025-05-29T12:51:37.6912890Z 10.0.20348
+2025-05-29T12:51:37.6913358Z Datacenter
+2025-05-29T12:51:37.6913769Z ##[endgroup]
+2025-05-29T12:51:37.6914204Z ##[group]Runner Image
+2025-05-29T12:51:37.6914666Z Image: windows-2022
+2025-05-29T12:51:37.6915122Z Version: 20250511.1.0
+2025-05-29T12:51:37.6916364Z Included Software: https://github.com/actions/runner-images/blob/win22/20250511.1/images/windows/Windows2022-Readme.md
+2025-05-29T12:51:37.6917626Z Image Release: https://github.com/actions/runner-images/releases/tag/win22%2F20250511.1
+2025-05-29T12:51:37.6918412Z ##[endgroup]
+2025-05-29T12:51:37.6918820Z ##[group]Runner Image Provisioner
+2025-05-29T12:51:37.6919356Z 2.0.437.1
+2025-05-29T12:51:37.6919734Z ##[endgroup]
+2025-05-29T12:51:37.6920819Z ##[group]GITHUB_TOKEN Permissions
+2025-05-29T12:51:37.6922490Z Actions: read
+2025-05-29T12:51:37.6923694Z Contents: read
+2025-05-29T12:51:37.6924248Z Metadata: read
+2025-05-29T12:51:37.6924653Z SecurityEvents: write
+2025-05-29T12:51:37.6925148Z ##[endgroup]
+2025-05-29T12:51:37.6927110Z Secret source: Actions
+2025-05-29T12:51:37.6927704Z Prepare workflow directory
+2025-05-29T12:51:37.7219496Z Prepare all required actions
+2025-05-29T12:51:37.7264613Z Getting action download info
+2025-05-29T12:51:38.2362005Z ##[group]Download immutable action package 'actions/checkout@v4'
+2025-05-29T12:51:38.2363050Z Version: 4.2.2
+2025-05-29T12:51:38.2364080Z Digest: sha256:ccb2698953eaebd21c7bf6268a94f9c26518a7e38e27e0b83c1fe1ad049819b1
+2025-05-29T12:51:38.2365211Z Source commit SHA: 11bd71901bbe5b1630ceea73d27597364c9af683
+2025-05-29T12:51:38.2365903Z ##[endgroup]
+2025-05-29T12:51:38.4296526Z Download action repository 'gacts/gitleaks@v1' (SHA:03e7105de6e27d619be467b70e6d2c9657780d9b)
+2025-05-29T12:51:39.3889536Z ##[group]Download immutable action package 'github/codeql-action@v3'
+2025-05-29T12:51:39.3890628Z Version: 3.28.18
+2025-05-29T12:51:39.3891589Z Digest: sha256:0b41304c3837968c577fdb6c0aa2845a72b559482f30bae7cb59d4bed90065ac
+2025-05-29T12:51:39.3892834Z Source commit SHA: ff0a06e83cb2de871e5a09832bc6a81e7276941f
+2025-05-29T12:51:39.3893721Z ##[endgroup]
+2025-05-29T12:51:53.2900743Z ##[group]Download immutable action package 'actions/setup-java@v4'
+2025-05-29T12:51:53.2901359Z Version: 4.7.1
+2025-05-29T12:51:53.2901727Z Digest: sha256:23223d64943473efb4336f60463c0429cd4f422cd5fc6c48a5cf0d5907c1aeac
+2025-05-29T12:51:53.2902198Z Source commit SHA: c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+2025-05-29T12:51:53.2902510Z ##[endgroup]
+2025-05-29T12:51:53.8423617Z ##[group]Download immutable action package 'actions/cache@v4'
+2025-05-29T12:51:53.8424023Z Version: 4.2.3
+2025-05-29T12:51:53.8424406Z Digest: sha256:c8a3bb963e1f1826d8fcc8d1354f0dd29d8ac1db1d4f6f20247055ae11b81ed9
+2025-05-29T12:51:53.8424872Z Source commit SHA: 5a3ec84eff668545956fd18022155c47e93e2684
+2025-05-29T12:51:53.8425202Z ##[endgroup]
+2025-05-29T12:51:54.0805753Z ##[group]Download immutable action package 'actions/upload-artifact@v4'
+2025-05-29T12:51:54.0806135Z Version: 4.6.2
+2025-05-29T12:51:54.0806444Z Digest: sha256:290722aa3281d5caf23d0acdc3dbeb3424786a1a01a9cc97e72f147225e37c38
+2025-05-29T12:51:54.0806859Z Source commit SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+2025-05-29T12:51:54.0807120Z ##[endgroup]
+2025-05-29T12:51:54.4779583Z Complete job name: Security Analysis
+2025-05-29T12:51:54.5820255Z ##[group]Run actions/checkout@v4
+2025-05-29T12:51:54.5820906Z with:
+2025-05-29T12:51:54.5821090Z   fetch-depth: 0
+2025-05-29T12:51:54.5821321Z   repository: xuanphongit/MVCTodo
+2025-05-29T12:51:54.5821722Z   token: ***
+2025-05-29T12:51:54.5821875Z   ssh-strict: true
+2025-05-29T12:51:54.5822040Z   ssh-user: git
+2025-05-29T12:51:54.5822213Z   persist-credentials: true
+2025-05-29T12:51:54.5822405Z   clean: true
+2025-05-29T12:51:54.5822574Z   sparse-checkout-cone-mode: true
+2025-05-29T12:51:54.5822799Z   fetch-tags: false
+2025-05-29T12:51:54.5824536Z   show-progress: true
+2025-05-29T12:51:54.5824715Z   lfs: false
+2025-05-29T12:51:54.5824867Z   submodules: false
+2025-05-29T12:51:54.5825043Z   set-safe-directory: true
+2025-05-29T12:51:54.5825518Z ##[endgroup]
+2025-05-29T12:51:55.7439086Z Syncing repository: xuanphongit/MVCTodo
+2025-05-29T12:51:55.7509181Z ##[group]Getting Git version info
+2025-05-29T12:51:55.7509857Z Working directory is 'D:\a\MVCTodo\MVCTodo'
+2025-05-29T12:51:56.0344832Z [command]"C:\Program Files\Git\bin\git.exe" version
+2025-05-29T12:51:56.1044784Z git version 2.49.0.windows.1
+2025-05-29T12:51:56.1180915Z ##[endgroup]
+2025-05-29T12:51:56.1204202Z Temporarily overriding HOME='D:\a\_temp\a52847d2-4afd-4c1d-a134-0b492edc9c34' before making global git config changes
+2025-05-29T12:51:56.1205191Z Adding repository directory to the temporary git global config as a safe directory
+2025-05-29T12:51:56.1216769Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\MVCTodo\MVCTodo
+2025-05-29T12:51:56.1864337Z Deleting the contents of 'D:\a\MVCTodo\MVCTodo'
+2025-05-29T12:51:56.1871953Z ##[group]Initializing the repository
+2025-05-29T12:51:56.1885220Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\MVCTodo\MVCTodo
+2025-05-29T12:51:56.5237201Z Initialized empty Git repository in D:/a/MVCTodo/MVCTodo/.git/
+2025-05-29T12:51:56.5286976Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/xuanphongit/MVCTodo
+2025-05-29T12:51:56.5927399Z ##[endgroup]
+2025-05-29T12:51:56.5928062Z ##[group]Disabling automatic garbage collection
+2025-05-29T12:51:56.5939002Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2025-05-29T12:51:56.6214563Z ##[endgroup]
+2025-05-29T12:51:56.6215201Z ##[group]Setting up auth
+2025-05-29T12:51:56.6232825Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2025-05-29T12:51:56.6489815Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2025-05-29T12:51:58.5791504Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-05-29T12:51:58.6021904Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2025-05-29T12:51:59.0528952Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2025-05-29T12:51:59.0769389Z ##[endgroup]
+2025-05-29T12:51:59.0770361Z ##[group]Fetching the repository
+2025-05-29T12:51:59.0786131Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2025-05-29T12:52:01.9500395Z From https://github.com/xuanphongit/MVCTodo
+2025-05-29T12:52:01.9501051Z  * [new branch]      master     -> origin/master
+2025-05-29T12:52:01.9846489Z [command]"C:\Program Files\Git\bin\git.exe" branch --list --remote origin/master
+2025-05-29T12:52:02.0508915Z   origin/master
+2025-05-29T12:52:02.0554774Z [command]"C:\Program Files\Git\bin\git.exe" rev-parse refs/remotes/origin/master
+2025-05-29T12:52:02.1143091Z c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T12:52:02.1171198Z ##[endgroup]
+2025-05-29T12:52:02.1172056Z ##[group]Determining the checkout info
+2025-05-29T12:52:02.1173015Z ##[endgroup]
+2025-05-29T12:52:02.1185824Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2025-05-29T12:52:02.1708742Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2025-05-29T12:52:02.2062069Z ##[group]Checking out the ref
+2025-05-29T12:52:02.2072974Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B master refs/remotes/origin/master
+2025-05-29T12:52:02.8506852Z branch 'master' set up to track 'origin/master'.
+2025-05-29T12:52:02.8516564Z Reset branch 'master'
+2025-05-29T12:52:02.8586171Z ##[endgroup]
+2025-05-29T12:52:02.9500679Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2025-05-29T12:52:02.9959181Z c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T12:52:03.0640605Z ##[group]Run gacts/gitleaks@v1
+2025-05-29T12:52:03.0640905Z with:
+2025-05-29T12:52:03.0641095Z   config-path: .gitleaks.toml
+2025-05-29T12:52:03.0641314Z   version: latest
+2025-05-29T12:52:03.0641479Z   fail-on-error: false
+2025-05-29T12:52:03.0641660Z   run: true
+2025-05-29T12:52:03.0642035Z   github-token: ***
+2025-05-29T12:52:03.0642447Z ##[endgroup]
+2025-05-29T12:52:03.9157067Z ##[group]💾 Install GitLeaks
+2025-05-29T12:52:03.9162520Z Version to install: 8.26.0 (target directory: C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks-8.26.0)
+2025-05-29T12:52:04.4466030Z Cache hit for: gitleaks-cache-v2-8.26.0-win32-x64
+2025-05-29T12:52:05.6148026Z Received 5884049 of 5884049 (100.0%), 6.4 MBs/sec
+2025-05-29T12:52:05.6151543Z Cache Size: ~6 MB (5884049 B)
+2025-05-29T12:52:05.6300771Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/049dd611-33aa-4794-8dc3-50e223934827/cache.tzst -P -C D:/a/MVCTodo/MVCTodo --force-local --use-compress-program "zstd -d"
+2025-05-29T12:52:06.0563308Z Cache restored successfully
+2025-05-29T12:52:06.0573373Z 👌 Restored from cache
+2025-05-29T12:52:06.0579633Z ##[endgroup]
+2025-05-29T12:52:06.0580301Z ##[group]🧪 Installation check
+2025-05-29T12:52:06.1515790Z GitLeaks installed: C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks-8.26.0\gitleaks.exe
+2025-05-29T12:52:06.6222507Z ##[endgroup]
+2025-05-29T12:52:06.6223065Z   🔑 Run GitLeaks
+2025-05-29T12:52:06.7030671Z [command]C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks-8.26.0\gitleaks.exe --config .gitleaks.toml --verbose --redact --report-format sarif --report-path C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif --source D:\a\MVCTodo\MVCTodo detect
+2025-05-29T12:52:07.0302067Z 
+2025-05-29T12:52:07.0302713Z     ○
+2025-05-29T12:52:07.0315647Z     │╲
+2025-05-29T12:52:07.0315853Z     │ ○
+2025-05-29T12:52:07.0316016Z     ○ ░
+2025-05-29T12:52:07.0316187Z     ░    gitleaks
+2025-05-29T12:52:07.0316304Z 
+2025-05-29T12:52:07.1752687Z Finding:     ...te string apiKey = "[1;3;mREDACTED[0m";
+2025-05-29T12:52:07.1753283Z Secret:      [1;3;mREDACTED[0m
+2025-05-29T12:52:07.1753635Z RuleID:      stripe-api-key
+2025-05-29T12:52:07.1753971Z Entropy:     4.351410
+2025-05-29T12:52:07.1754262Z File:        GITLEAKS-CONFIG.md
+2025-05-29T12:52:07.1754580Z Line:        193
+2025-05-29T12:52:07.1754903Z Commit:      862ef478f7d052cca2afec03f57035e8303f62c9
+2025-05-29T12:52:07.1755439Z Author:      PhongMX
+2025-05-29T12:52:07.1755912Z Email:       xuanphongit1109@gmail.com
+2025-05-29T12:52:07.1756284Z Date:        2025-05-29T11:57:25Z
+2025-05-29T12:52:07.1756983Z Fingerprint: 862ef478f7d052cca2afec03f57035e8303f62c9:GITLEAKS-CONFIG.md:stripe-api-key:193
+2025-05-29T12:52:07.1758294Z Link:        https://github.com/xuanphongit/MVCTodo/blob/862ef478f7d052cca2afec03f57035e8303f62c9/GITLEAKS-CONFIG.md?plain=1#L193
+2025-05-29T12:52:07.1759132Z 
+2025-05-29T12:52:08.5153954Z [90m12:52PM[0m [32mINF[0m [1m15 commits scanned.[0m
+2025-05-29T12:52:08.5155169Z [90m12:52PM[0m [32mINF[0m [1mscanned ~9501785 bytes (9.50 MB) in 1.49s[0m
+2025-05-29T12:52:08.5155819Z [90m12:52PM[0m [33mWRN[0m [1mleaks found: 1[0m
+2025-05-29T12:52:08.5237813Z ##[warning]⛔ GitLeaks encountered leaks
+2025-05-29T12:52:08.5534366Z ##[group]Run github/codeql-action/upload-sarif@v3
+2025-05-29T12:52:08.5534960Z with:
+2025-05-29T12:52:08.5535420Z   sarif_file: C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif
+2025-05-29T12:52:08.5535717Z   category: gitleaks
+2025-05-29T12:52:08.5535897Z   checkout_path: D:\a\MVCTodo\MVCTodo
+2025-05-29T12:52:08.5536233Z   token: ***
+2025-05-29T12:52:08.5536382Z   matrix: null
+2025-05-29T12:52:08.5536736Z   wait-for-processing: true
+2025-05-29T12:52:08.5536934Z ##[endgroup]
+2025-05-29T12:52:13.9241326Z ##[group]Uploading results
+2025-05-29T12:52:13.9242082Z Processing sarif files: ["C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\gitleaks.sarif"]
+2025-05-29T12:52:13.9247155Z Validating C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif
+2025-05-29T12:52:13.9677705Z Adding fingerprints to SARIF file. See https://docs.github.com/en/enterprise-cloud@latest/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning#providing-data-to-track-code-scanning-alerts-across-runs for more information.
+2025-05-29T12:52:14.1028437Z Uploading results
+2025-05-29T12:52:14.3554175Z Successfully uploaded results
+2025-05-29T12:52:14.3555846Z ##[endgroup]
+2025-05-29T12:52:14.3562029Z ##[group]Waiting for processing to finish
+2025-05-29T12:52:14.5583581Z Analysis upload status is pending.
+2025-05-29T12:52:19.9120698Z Analysis upload status is complete.
+2025-05-29T12:52:19.9121350Z ##[endgroup]
+2025-05-29T12:52:20.5430380Z ##[group]Run actions/setup-java@v4
+2025-05-29T12:52:20.5430678Z with:
+2025-05-29T12:52:20.5430831Z   distribution: temurin
+2025-05-29T12:52:20.5431016Z   java-version: 11
+2025-05-29T12:52:20.5431179Z   java-package: jdk
+2025-05-29T12:52:20.5431352Z   check-latest: false
+2025-05-29T12:52:20.5431523Z   server-id: github
+2025-05-29T12:52:20.5431699Z   server-username: GITHUB_ACTOR
+2025-05-29T12:52:20.5431907Z   server-password: GITHUB_TOKEN
+2025-05-29T12:52:20.5432113Z   overwrite-settings: true
+2025-05-29T12:52:20.5432303Z   job-status: success
+2025-05-29T12:52:20.5432579Z   token: ***
+2025-05-29T12:52:20.5432724Z env:
+2025-05-29T12:52:20.5432882Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T12:52:20.5433125Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T12:52:20.5433364Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T12:52:20.5433603Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T12:52:20.5433827Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T12:52:20.5434189Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T12:52:20.5434554Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T12:52:20.5434914Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T12:52:20.5435229Z ##[endgroup]
+2025-05-29T12:52:20.8185167Z ##[group]Installed distributions
+2025-05-29T12:52:20.9861491Z Resolved Java 11.0.27+6 from tool-cache
+2025-05-29T12:52:20.9861876Z Setting Java 11.0.27+6 as the default
+2025-05-29T12:52:20.9887256Z Creating toolchains.xml for JDK version 11 from temurin
+2025-05-29T12:52:21.0082156Z Writing to C:\Users\runneradmin\.m2\toolchains.xml
+2025-05-29T12:52:21.0086185Z 
+2025-05-29T12:52:21.0086501Z Java configuration:
+2025-05-29T12:52:21.0086823Z   Distribution: temurin
+2025-05-29T12:52:21.0087135Z   Version: 11.0.27+6
+2025-05-29T12:52:21.0088490Z   Path: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:21.0088899Z 
+2025-05-29T12:52:21.0090014Z ##[endgroup]
+2025-05-29T12:52:21.0107602Z Creating settings.xml with server-id: github
+2025-05-29T12:52:21.0118370Z Writing to C:\Users\runneradmin\.m2\settings.xml
+2025-05-29T12:52:21.0382421Z ##[group]Run actions/cache@v4
+2025-05-29T12:52:21.0382920Z with:
+2025-05-29T12:52:21.0383737Z   path: ~/.gradle/caches
+~/odc-data
+D:\a\MVCTodo\MVCTodo/odc-data
+D:\a\_temp/odc-data
+%USERPROFILE%/odc-data
+
+2025-05-29T12:52:21.0384329Z   key: Windows-owasp-nvd-db-10-c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T12:52:21.0384808Z   restore-keys: Windows-owasp-nvd-db-10-
+Windows-owasp-nvd-db-
+Windows-owasp-db-
+
+2025-05-29T12:52:21.0385177Z   enableCrossOsArchive: false
+2025-05-29T12:52:21.0385383Z   fail-on-cache-miss: false
+2025-05-29T12:52:21.0385567Z   lookup-only: false
+2025-05-29T12:52:21.0385735Z   save-always: false
+2025-05-29T12:52:21.0385883Z env:
+2025-05-29T12:52:21.0386049Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T12:52:21.0386478Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T12:52:21.0386710Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T12:52:21.0386946Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T12:52:21.0387200Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T12:52:21.0387516Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T12:52:21.0387882Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T12:52:21.0388260Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T12:52:21.0388755Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:21.0389632Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:21.0389954Z ##[endgroup]
+2025-05-29T12:52:21.6514707Z Cache not found for input keys: Windows-owasp-nvd-db-10-c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b, Windows-owasp-nvd-db-10-, Windows-owasp-nvd-db-, Windows-owasp-db-
+2025-05-29T12:52:21.6728848Z ##[group]Run actions/cache/restore@v4
+2025-05-29T12:52:21.6729185Z with:
+2025-05-29T12:52:21.6729447Z   path: ~/odc-data
+D:\a\MVCTodo\MVCTodo/odc-data
+%USERPROFILE%/odc-data
+
+2025-05-29T12:52:21.6729886Z   key: Windows-nvd-database-10-c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T12:52:21.6730349Z   restore-keys: Windows-nvd-database-
+Windows-owasp-nvd-db-
+Windows-owasp-db-
+
+2025-05-29T12:52:21.6730708Z   enableCrossOsArchive: false
+2025-05-29T12:52:21.6730921Z   fail-on-cache-miss: false
+2025-05-29T12:52:21.6731108Z   lookup-only: false
+2025-05-29T12:52:21.6731274Z env:
+2025-05-29T12:52:21.6731437Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T12:52:21.6731693Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T12:52:21.6731934Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T12:52:21.6732171Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T12:52:21.6732398Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T12:52:21.6732750Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T12:52:21.6733165Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T12:52:21.6733535Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T12:52:21.6733978Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:21.6734408Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:21.6734732Z ##[endgroup]
+2025-05-29T12:52:22.2036521Z Cache hit for: Windows-nvd-database-10-c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T12:52:22.9009354Z Received 280754 of 280754 (100.0%), 0.7 MBs/sec
+2025-05-29T12:52:22.9011632Z Cache Size: ~0 MB (280754 B)
+2025-05-29T12:52:22.9041307Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/87e3b9a1-dc21-41dc-9901-7316d435013e/cache.tzst -P -C D:/a/MVCTodo/MVCTodo --force-local --use-compress-program "zstd -d"
+2025-05-29T12:52:22.9621037Z Cache restored successfully
+2025-05-29T12:52:22.9822088Z Cache restored from key: Windows-nvd-database-9-41a8a42f4eae689f4a45982b2a803ba95cd393d0
+2025-05-29T12:52:23.0046195Z ##[group]Run $odcVersion = "12.1.1"
+2025-05-29T12:52:23.0046557Z [36;1m$odcVersion = "12.1.1"[0m
+2025-05-29T12:52:23.0047202Z [36;1m$downloadUrl = "https://github.com/dependency-check/DependencyCheck/releases/download/v$odcVersion/dependency-check-$odcVersion-release.zip"[0m
+2025-05-29T12:52:23.0047856Z [36;1m$zipPath = "dependency-check.zip"[0m
+2025-05-29T12:52:23.0048124Z [36;1m$extractPath = "dependency-check"[0m
+2025-05-29T12:52:23.0048352Z [36;1m[0m
+2025-05-29T12:52:23.0048608Z [36;1mWrite-Host "Downloading OWASP Dependency Check v$odcVersion..."[0m
+2025-05-29T12:52:23.0048912Z [36;1mtry {[0m
+2025-05-29T12:52:23.0049211Z [36;1m  Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -ErrorAction Stop[0m
+2025-05-29T12:52:23.0049638Z [36;1m  Write-Host "[SUCCESS] Download completed successfully"[0m
+2025-05-29T12:52:23.0050850Z [36;1m} catch {[0m
+2025-05-29T12:52:23.0051162Z [36;1m  Write-Error "[ERROR] Failed to download OWASP Dependency Check: $_"[0m
+2025-05-29T12:52:23.0051465Z [36;1m  exit 1[0m
+2025-05-29T12:52:23.0051620Z [36;1m}[0m
+2025-05-29T12:52:23.0051764Z [36;1m[0m
+2025-05-29T12:52:23.0051972Z [36;1mWrite-Host "Extracting OWASP Dependency Check..."[0m
+2025-05-29T12:52:23.0052233Z [36;1mtry {[0m
+2025-05-29T12:52:23.0052515Z [36;1m  Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force[0m
+2025-05-29T12:52:23.0052923Z [36;1m  Write-Host "[SUCCESS] Extraction completed successfully"[0m
+2025-05-29T12:52:23.0053202Z [36;1m} catch {[0m
+2025-05-29T12:52:23.0053466Z [36;1m  Write-Error "[ERROR] Failed to extract OWASP Dependency Check: $_"[0m
+2025-05-29T12:52:23.0053786Z [36;1m  exit 1[0m
+2025-05-29T12:52:23.0053934Z [36;1m}[0m
+2025-05-29T12:52:23.0054075Z [36;1m[0m
+2025-05-29T12:52:23.0054226Z [36;1m# Add to PATH[0m
+2025-05-29T12:52:23.0054510Z [36;1m$odcPath = Join-Path $PWD "dependency-check\dependency-check\bin"[0m
+2025-05-29T12:52:23.0054952Z [36;1mecho $odcPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append[0m
+2025-05-29T12:52:23.0055402Z [36;1mWrite-Host "[SUCCESS] Added OWASP Dependency Check to PATH: $odcPath"[0m
+2025-05-29T12:52:23.1864729Z shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.EXE -command ". '{0}'"
+2025-05-29T12:52:23.1865121Z env:
+2025-05-29T12:52:23.1865309Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T12:52:23.1865575Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T12:52:23.1865824Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T12:52:23.1866074Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T12:52:23.1866319Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T12:52:23.1866650Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T12:52:23.1867043Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T12:52:23.1867438Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T12:52:23.1867911Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:23.1868357Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:52:23.1868683Z ##[endgroup]
+2025-05-29T12:52:23.4508427Z Downloading OWASP Dependency Check v12.1.1...
+2025-05-29T12:53:07.0344643Z [SUCCESS] Download completed successfully
+2025-05-29T12:53:07.0351925Z Extracting OWASP Dependency Check...
+2025-05-29T12:53:09.3842501Z [SUCCESS] Extraction completed successfully
+2025-05-29T12:53:09.3910135Z [SUCCESS] Added OWASP Dependency Check to PATH: D:\a\MVCTodo\MVCTodo\dependency-check\dependency-check\bin
+2025-05-29T12:53:09.4176635Z ##[group]Run $dataDir = Join-Path $env:USERPROFILE "odc-data"
+2025-05-29T12:53:09.4177512Z [36;1m$dataDir = Join-Path $env:USERPROFILE "odc-data"[0m
+2025-05-29T12:53:09.4177818Z [36;1m$reportDir = "odc-reports"[0m
+2025-05-29T12:53:09.4178046Z [36;1m[0m
+2025-05-29T12:53:09.4178236Z [36;1m# Create directories if they don't exist[0m
+2025-05-29T12:53:09.4178507Z [36;1mif (!(Test-Path $dataDir)) { [0m
+2025-05-29T12:53:09.4178815Z [36;1m  New-Item -ItemType Directory -Path $dataDir -Force [0m
+2025-05-29T12:53:09.4179166Z [36;1m  Write-Host "[SUCCESS] Created data directory: $dataDir"[0m
+2025-05-29T12:53:09.4179441Z [36;1m}[0m
+2025-05-29T12:53:09.4179614Z [36;1mif (!(Test-Path $reportDir)) { [0m
+2025-05-29T12:53:09.4179909Z [36;1m  New-Item -ItemType Directory -Path $reportDir -Force [0m
+2025-05-29T12:53:09.4180277Z [36;1m  Write-Host "[SUCCESS] Created report directory: $reportDir"[0m
+2025-05-29T12:53:09.4180566Z [36;1m}[0m
+2025-05-29T12:53:09.4180740Z [36;1m[0m
+2025-05-29T12:53:09.4180974Z [36;1mWrite-Host "[INFO] Starting OWASP Dependency Check scan..."[0m
+2025-05-29T12:53:09.4181332Z [36;1mWrite-Host "[INFO] Project: Todo MVC Security Scan"[0m
+2025-05-29T12:53:09.4181687Z [36;1mWrite-Host "[INFO] CVSS Threshold: >= 7.0 (High/Critical)"[0m
+2025-05-29T12:53:09.4182137Z [36;1m[0m
+2025-05-29T12:53:09.4182303Z [36;1m# Check cache content and validate[0m
+2025-05-29T12:53:09.4182718Z [36;1m$cacheFiles = Get-ChildItem -Path $dataDir -Recurse -File -ErrorAction SilentlyContinue[0m
+2025-05-29T12:53:09.4183125Z [36;1mif ($cacheFiles.Count -gt 0) {[0m
+2025-05-29T12:53:09.4183535Z [36;1m  $cacheSizeMB = [math]::Round(($cacheFiles | Measure-Object -Property Length -Sum).Sum / 1MB, 2)[0m
+2025-05-29T12:53:09.4184069Z [36;1m  Write-Host "[INFO] Found $($cacheFiles.Count) cached NVD files ($cacheSizeMB MB)"[0m
+2025-05-29T12:53:09.4184414Z [36;1m  [0m
+2025-05-29T12:53:09.4184686Z [36;1m  # Check if cache seems corrupted (too small for a proper NVD database)[0m
+2025-05-29T12:53:09.4185022Z [36;1m  if ($cacheSizeMB -lt 10) {[0m
+2025-05-29T12:53:09.4185429Z [36;1m    Write-Host "[WARNING] Cache appears corrupted or incomplete ($cacheSizeMB MB < 10 MB expected)"[0m
+2025-05-29T12:53:09.4185947Z [36;1m    Write-Host "[INFO] Clearing corrupted cache to force fresh download..."[0m
+2025-05-29T12:53:09.4186402Z [36;1m    Remove-Item -Path $dataDir -Recurse -Force -ErrorAction SilentlyContinue[0m
+2025-05-29T12:53:09.4186808Z [36;1m    New-Item -ItemType Directory -Path $dataDir -Force[0m
+2025-05-29T12:53:09.4187207Z [36;1m    Write-Host "[SUCCESS] Cleared corrupted cache, will download fresh NVD data"[0m
+2025-05-29T12:53:09.4187634Z [36;1m  }[0m
+2025-05-29T12:53:09.4187819Z [36;1m} else {[0m
+2025-05-29T12:53:09.4188094Z [36;1m  Write-Host "[INFO] No cached NVD data found - fresh download required"[0m
+2025-05-29T12:53:09.4188398Z [36;1m}[0m
+2025-05-29T12:53:09.4188542Z [36;1m[0m
+2025-05-29T12:53:09.4188699Z [36;1m# Show cache status[0m
+2025-05-29T12:53:09.4188979Z [36;1mWrite-Host "[INFO] Cache Status: MISS - Will download NVD data"[0m
+2025-05-29T12:53:09.4189276Z [36;1m[0m
+2025-05-29T12:53:09.4189436Z [36;1m# Note about NVD API access[0m
+2025-05-29T12:53:09.4189763Z [36;1mWrite-Host "[INFO] Using public NVD API access (no API key configured)"[0m
+2025-05-29T12:53:09.4190235Z [36;1mWrite-Host "[INFO] Updates will be slower due to rate limiting, but fully functional"[0m
+2025-05-29T12:53:09.4190588Z [36;1m[0m
+2025-05-29T12:53:09.4190806Z [36;1m# Build the base command arguments (only supported options)[0m
+2025-05-29T12:53:09.4191105Z [36;1m$dependencyCheckArgs = @([0m
+2025-05-29T12:53:09.4191351Z [36;1m  "--project", "Todo MVC Security Scan",[0m
+2025-05-29T12:53:09.4191606Z [36;1m  "--scan", ".",[0m
+2025-05-29T12:53:09.4191786Z [36;1m  "--format", "ALL",[0m
+2025-05-29T12:53:09.4191982Z [36;1m  "--out", $reportDir,[0m
+2025-05-29T12:53:09.4192185Z [36;1m  "--data", $dataDir,[0m
+2025-05-29T12:53:09.4193744Z [36;1m  "--enableRetired",[0m
+2025-05-29T12:53:09.4194022Z [36;1m  "--enableExperimental",[0m
+2025-05-29T12:53:09.4194264Z [36;1m  "--failOnCVSS", "7",[0m
+2025-05-29T12:53:09.4194478Z [36;1m  "--exclude", "**\bin\**",[0m
+2025-05-29T12:53:09.4194697Z [36;1m  "--exclude", "**\obj\**",[0m
+2025-05-29T12:53:09.4194909Z [36;1m  "--exclude", "**\.git\**",[0m
+2025-05-29T12:53:09.4195127Z [36;1m  "--exclude", "**\.vs\**",[0m
+2025-05-29T12:53:09.4195360Z [36;1m  "--exclude", "**\node_modules\**",[0m
+2025-05-29T12:53:09.4195606Z [36;1m  "--exclude", "**\packages\**",[0m
+2025-05-29T12:53:09.4195836Z [36;1m  "--exclude", "**\.nuget\**",[0m
+2025-05-29T12:53:09.4196074Z [36;1m  "--exclude", "**\TestResults\**"[0m
+2025-05-29T12:53:09.4196290Z [36;1m)[0m
+2025-05-29T12:53:09.4196440Z [36;1m[0m
+2025-05-29T12:53:09.4196616Z [36;1m# First attempt: Try with NVD updates[0m
+2025-05-29T12:53:09.4196948Z [36;1mWrite-Host "[INFO] Attempting scan with NVD database updates..."[0m
+2025-05-29T12:53:09.4197255Z [36;1mtry {[0m
+2025-05-29T12:53:09.4197471Z [36;1m  & dependency-check.bat @dependencyCheckArgs[0m
+2025-05-29T12:53:09.4197736Z [36;1m  $scanResult = $LASTEXITCODE[0m
+2025-05-29T12:53:09.4198073Z [36;1m  [0m
+2025-05-29T12:53:09.4198241Z [36;1m  if ($scanResult -eq 0) {[0m
+2025-05-29T12:53:09.4198622Z [36;1m    Write-Host "[SUCCESS] OWASP Dependency Check completed successfully with NVD updates"[0m
+2025-05-29T12:53:09.4199008Z [36;1m  } elseif ($scanResult -eq 1) {[0m
+2025-05-29T12:53:09.4199346Z [36;1m    Write-Host "[WARNING] High-severity vulnerabilities found (CVSS >= 7.0)"[0m
+2025-05-29T12:53:09.4199771Z [36;1m    Write-Host "[INFO] Scan completed but vulnerabilities detected"[0m
+2025-05-29T12:53:09.4200168Z [36;1m    # Don't exit - this is expected behavior when vulnerabilities are found[0m
+2025-05-29T12:53:09.4200485Z [36;1m  } else {[0m
+2025-05-29T12:53:09.4200745Z [36;1m    throw "Dependency check failed with exit code: $scanResult"[0m
+2025-05-29T12:53:09.4201037Z [36;1m  }[0m
+2025-05-29T12:53:09.4201182Z [36;1m} catch {[0m
+2025-05-29T12:53:09.4201396Z [36;1m  Write-Host "[ERROR] First attempt failed: $_"[0m
+2025-05-29T12:53:09.4201643Z [36;1m  [0m
+2025-05-29T12:53:09.4201871Z [36;1m  # If database is corrupted, try clearing and re-downloading[0m
+2025-05-29T12:53:09.4202173Z [36;1m  if ($scanResult -eq 13) {[0m
+2025-05-29T12:53:09.4202538Z [36;1m    Write-Host "[INFO] Database corruption detected (exit code 13), clearing cache..."[0m
+2025-05-29T12:53:09.4203021Z [36;1m    Remove-Item -Path $dataDir -Recurse -Force -ErrorAction SilentlyContinue[0m
+2025-05-29T12:53:09.4203420Z [36;1m    New-Item -ItemType Directory -Path $dataDir -Force[0m
+2025-05-29T12:53:09.4203685Z [36;1m    [0m
+2025-05-29T12:53:09.4203917Z [36;1m    Write-Host "[INFO] Attempting fresh database download..."[0m
+2025-05-29T12:53:09.4204195Z [36;1m    try {[0m
+2025-05-29T12:53:09.4204415Z [36;1m      & dependency-check.bat @dependencyCheckArgs[0m
+2025-05-29T12:53:09.4204697Z [36;1m      $freshResult = $LASTEXITCODE[0m
+2025-05-29T12:53:09.4204915Z [36;1m      [0m
+2025-05-29T12:53:09.4205119Z [36;1m      if ($freshResult -eq 0 -or $freshResult -eq 1) {[0m
+2025-05-29T12:53:09.4205437Z [36;1m        Write-Host "[SUCCESS] Fresh download successful"[0m
+2025-05-29T12:53:09.4205717Z [36;1m        if ($freshResult -eq 1) {[0m
+2025-05-29T12:53:09.4206038Z [36;1m          Write-Host "[WARNING] High-severity vulnerabilities found"[0m
+2025-05-29T12:53:09.4206320Z [36;1m        }[0m
+2025-05-29T12:53:09.4206478Z [36;1m        return[0m
+2025-05-29T12:53:09.4206650Z [36;1m      } else {[0m
+2025-05-29T12:53:09.4206913Z [36;1m        throw "Fresh download also failed with exit code: $freshResult"[0m
+2025-05-29T12:53:09.4207211Z [36;1m      }[0m
+2025-05-29T12:53:09.4207365Z [36;1m    } catch {[0m
+2025-05-29T12:53:09.4207593Z [36;1m      Write-Host "[ERROR] Fresh download failed: $_"[0m
+2025-05-29T12:53:09.4208285Z [36;1m    }[0m
+2025-05-29T12:53:09.4208458Z [36;1m  }[0m
+2025-05-29T12:53:09.4208604Z [36;1m  [0m
+2025-05-29T12:53:09.4208854Z [36;1m  Write-Host "[INFO] Attempting fallback scan without NVD updates..."[0m
+2025-05-29T12:53:09.4209181Z [36;1m  [0m
+2025-05-29T12:53:09.4209424Z [36;1m  # Second attempt: Skip NVD updates and use cached/local data only[0m
+2025-05-29T12:53:09.4209810Z [36;1m  $fallbackArgs = $dependencyCheckArgs + @("--noupdate")[0m
+2025-05-29T12:53:09.4210078Z [36;1m  [0m
+2025-05-29T12:53:09.4210217Z [36;1m  try {[0m
+2025-05-29T12:53:09.4210412Z [36;1m    & dependency-check.bat @fallbackArgs[0m
+2025-05-29T12:53:09.4210670Z [36;1m    $fallbackResult = $LASTEXITCODE[0m
+2025-05-29T12:53:09.4210892Z [36;1m    [0m
+2025-05-29T12:53:09.4211067Z [36;1m    if ($fallbackResult -eq 0) {[0m
+2025-05-29T12:53:09.4211474Z [36;1m      Write-Host "[SUCCESS] OWASP Dependency Check completed with cached data (NVD update failed)"[0m
+2025-05-29T12:53:09.4211897Z [36;1m    } elseif ($fallbackResult -eq 1) {[0m
+2025-05-29T12:53:09.4212268Z [36;1m      Write-Host "[WARNING] High-severity vulnerabilities found using cached data"[0m
+2025-05-29T12:53:09.4212822Z [36;1m      Write-Host "[INFO] Note: Results may not include the latest vulnerability data due to NVD update failure"[0m
+2025-05-29T12:53:09.4213323Z [36;1m    } else {[0m
+2025-05-29T12:53:09.4213601Z [36;1m      throw "Fallback scan also failed with exit code: $fallbackResult"[0m
+2025-05-29T12:53:09.4213911Z [36;1m    }[0m
+2025-05-29T12:53:09.4214070Z [36;1m  } catch {[0m
+2025-05-29T12:53:09.4214290Z [36;1m    Write-Host "[ERROR] Both scan attempts failed"[0m
+2025-05-29T12:53:09.4214639Z [36;1m    Write-Host "[ERROR] NVD API error and fallback scan error: $_"[0m
+2025-05-29T12:53:09.4214931Z [36;1m    [0m
+2025-05-29T12:53:09.4215214Z [36;1m    # Third attempt: Absolute minimal scan - just check what's available locally[0m
+2025-05-29T12:53:09.4215719Z [36;1m    Write-Host "[INFO] Attempting absolute minimal scan with no external dependencies..."[0m
+2025-05-29T12:53:09.4216093Z [36;1m    [0m
+2025-05-29T12:53:09.4216296Z [36;1m    # Create minimal scan with most basic settings[0m
+2025-05-29T12:53:09.4216562Z [36;1m    $absoluteMinimalArgs = @([0m
+2025-05-29T12:53:09.4216821Z [36;1m      "--project", "Todo MVC Security Scan",[0m
+2025-05-29T12:53:09.4217066Z [36;1m      "--scan", ".",[0m
+2025-05-29T12:53:09.4217259Z [36;1m      "--format", "HTML",[0m
+2025-05-29T12:53:09.4217476Z [36;1m      "--out", $reportDir,[0m
+2025-05-29T12:53:09.4217692Z [36;1m      "--noupdate",[0m
+2025-05-29T12:53:09.4217890Z [36;1m      "--disableVersionCheck"[0m
+2025-05-29T12:53:09.4218102Z [36;1m    )[0m
+2025-05-29T12:53:09.4218252Z [36;1m    [0m
+2025-05-29T12:53:09.4218399Z [36;1m    try {[0m
+2025-05-29T12:53:09.4218604Z [36;1m      & dependency-check.bat @absoluteMinimalArgs[0m
+2025-05-29T12:53:09.4218883Z [36;1m      $minimalResult = $LASTEXITCODE[0m
+2025-05-29T12:53:09.4219303Z [36;1m      [0m
+2025-05-29T12:53:09.4219663Z [36;1m      # Accept any non-fatal result for minimal scan[0m
+2025-05-29T12:53:09.4220050Z [36;1m      if ($minimalResult -eq 0 -or $minimalResult -eq 1 -or $minimalResult -eq 2) {[0m
+2025-05-29T12:53:09.4220494Z [36;1m        Write-Host "[SUCCESS] Minimal scan completed with available data"[0m
+2025-05-29T12:53:09.4220980Z [36;1m        Write-Host "[WARNING] This scan used minimal vulnerability data - results are very limited"[0m
+2025-05-29T12:53:09.4221378Z [36;1m        if ($minimalResult -eq 1) {[0m
+2025-05-29T12:53:09.4221710Z [36;1m          Write-Host "[INFO] Some vulnerabilities detected with limited data"[0m
+2025-05-29T12:53:09.4222022Z [36;1m        }[0m
+2025-05-29T12:53:09.4222177Z [36;1m      } else {[0m
+2025-05-29T12:53:09.4222434Z [36;1m        throw "Minimal scan failed with exit code: $minimalResult"[0m
+2025-05-29T12:53:09.4222719Z [36;1m      }[0m
+2025-05-29T12:53:09.4222873Z [36;1m    } catch {[0m
+2025-05-29T12:53:09.4223251Z [36;1m      Write-Host "[ERROR] All scan attempts failed - creating fallback report"[0m
+2025-05-29T12:53:09.4223615Z [36;1m      Write-Host "[ERROR] Final error: $_"[0m
+2025-05-29T12:53:09.4223840Z [36;1m      [0m
+2025-05-29T12:53:09.4224051Z [36;1m      # As last resort, generate a basic report manually[0m
+2025-05-29T12:53:09.4224403Z [36;1m      Write-Host "[INFO] Creating basic scan report as fallback..."[0m
+2025-05-29T12:53:09.4224719Z [36;1m      $basicReportContent = @"[0m
+2025-05-29T12:53:09.4224946Z [36;1m<!DOCTYPE html>[0m
+2025-05-29T12:53:09.4225120Z [36;1m<html>[0m
+2025-05-29T12:53:09.4225270Z [36;1m<head>[0m
+2025-05-29T12:53:09.4225493Z [36;1m    <title>OWASP Dependency Check - Scan Failed</title>[0m
+2025-05-29T12:53:09.4225752Z [36;1m    <style>[0m
+2025-05-29T12:53:09.4225988Z [36;1m        body { font-family: Arial, sans-serif; margin: 40px; }[0m
+2025-05-29T12:53:09.4226401Z [36;1m        .header { background-color: #f8d7da; padding: 20px; border-radius: 5px; }[0m
+2025-05-29T12:53:09.4226756Z [36;1m        .error { color: #721c24; }[0m
+2025-05-29T12:53:09.4227176Z [36;1m        .recommendations { background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin-top: 20px; }[0m
+2025-05-29T12:53:09.4228196Z [36;1m    </style>[0m
+2025-05-29T12:53:09.4228370Z [36;1m</head>[0m
+2025-05-29T12:53:09.4228516Z [36;1m<body>[0m
+2025-05-29T12:53:09.4228683Z [36;1m    <div class="header">[0m
+2025-05-29T12:53:09.4228925Z [36;1m        <h1>OWASP Dependency Check Report</h1>[0m
+2025-05-29T12:53:09.4229239Z [36;1m        <h2 class="error">Scan Status: Failed - Database Issues</h2>[0m
+2025-05-29T12:53:09.4229526Z [36;1m    </div>[0m
+2025-05-29T12:53:09.4229772Z [36;1m    <p><strong>Project:</strong> Todo MVC Security Scan</p>[0m
+2025-05-29T12:53:09.4230134Z [36;1m    <p><strong>Scan Date:</strong> $((Get-Date).ToString())</p>[0m
+2025-05-29T12:53:09.4230675Z [36;1m    <p><strong>Status:</strong> Unable to complete vulnerability scan due to NVD database corruption or connectivity issues.</p>[0m
+2025-05-29T12:53:09.4231164Z [36;1m    <h3>Technical Details:</h3>[0m
+2025-05-29T12:53:09.4231382Z [36;1m    <ul>[0m
+2025-05-29T12:53:09.4231645Z [36;1m        <li><strong>Error:</strong> NVD database corruption (exit code 13)</li>[0m
+2025-05-29T12:53:09.4232102Z [36;1m        <li><strong>Issue:</strong> "No documents exist" - database is empty or corrupted</li>[0m
+2025-05-29T12:53:09.4232590Z [36;1m        <li><strong>Cache Status:</strong> Corrupted or insufficient cached data</li>[0m
+2025-05-29T12:53:09.4233012Z [36;1m        <li><strong>Network:</strong> Unable to download fresh NVD data</li>[0m
+2025-05-29T12:53:09.4233314Z [36;1m    </ul>[0m
+2025-05-29T12:53:09.4233502Z [36;1m    <div class="recommendations">[0m
+2025-05-29T12:53:09.4233757Z [36;1m        <h3>Immediate Actions Required:</h3>[0m
+2025-05-29T12:53:09.4233981Z [36;1m        <ol>[0m
+2025-05-29T12:53:09.4234367Z [36;1m            <li><strong>Manual Review:</strong> Manually check dependencies against known vulnerability databases</li>[0m
+2025-05-29T12:53:09.4234961Z [36;1m            <li><strong>Network Check:</strong> Verify GitHub Actions runner can access nvd.nist.gov</li>[0m
+2025-05-29T12:53:09.4235455Z [36;1m            <li><strong>API Key:</strong> Validate NVD API key is working correctly</li>[0m
+2025-05-29T12:53:09.4235880Z [36;1m            <li><strong>Re-run:</strong> Try running the scan again in a few hours</li>[0m
+2025-05-29T12:53:09.4236424Z [36;1m            <li><strong>Alternative Tools:</strong> Consider using Snyk, WhiteSource, or other vulnerability scanners</li>[0m
+2025-05-29T12:53:09.4236855Z [36;1m        </ol>[0m
+2025-05-29T12:53:09.4237068Z [36;1m        <h3>Dependencies to Check Manually:</h3>[0m
+2025-05-29T12:53:09.4237300Z [36;1m        <ul>[0m
+2025-05-29T12:53:09.4237523Z [36;1m            <li>Check all NuGet packages in Todo.csproj</li>[0m
+2025-05-29T12:53:09.4237936Z [36;1m            <li>Review .NET version for known security issues</li>[0m
+2025-05-29T12:53:09.4238256Z [36;1m            <li>Validate any third-party libraries</li>[0m
+2025-05-29T12:53:09.4238504Z [36;1m        </ul>[0m
+2025-05-29T12:53:09.4238671Z [36;1m    </div>[0m
+2025-05-29T12:53:09.4238834Z [36;1m</body>[0m
+2025-05-29T12:53:09.4238979Z [36;1m</html>[0m
+2025-05-29T12:53:09.4239126Z [36;1m"@[0m
+2025-05-29T12:53:09.4239404Z [36;1m      $basicReportPath = Join-Path $reportDir "dependency-check-report.html"[0m
+2025-05-29T12:53:09.4239863Z [36;1m      $basicReportContent | Out-File -FilePath $basicReportPath -Encoding UTF8[0m
+2025-05-29T12:53:09.4240295Z [36;1m      Write-Host "[INFO] Created fallback report: $basicReportPath"[0m
+2025-05-29T12:53:09.4240587Z [36;1m    }[0m
+2025-05-29T12:53:09.4240730Z [36;1m  }[0m
+2025-05-29T12:53:09.4240879Z [36;1m}[0m
+2025-05-29T12:53:09.4241022Z [36;1m[0m
+2025-05-29T12:53:09.4241192Z [36;1m# Verify reports were generated[0m
+2025-05-29T12:53:09.4241575Z [36;1m$reportFiles = Get-ChildItem -Path $reportDir -File -ErrorAction SilentlyContinue[0m
+2025-05-29T12:53:09.4241973Z [36;1mif ($reportFiles.Count -gt 0) {[0m
+2025-05-29T12:53:09.4242312Z [36;1m  Write-Host "[SUCCESS] Generated $($reportFiles.Count) report files:"[0m
+2025-05-29T12:53:09.4242728Z [36;1m  foreach ($file in $reportFiles) {[0m
+2025-05-29T12:53:09.4243006Z [36;1m    $sizeMB = [math]::Round($file.Length / 1MB, 2)[0m
+2025-05-29T12:53:09.4260373Z [36;1m    Write-Host "  - $($file.Name) ($sizeMB MB)"[0m
+2025-05-29T12:53:09.4260721Z [36;1m  }[0m
+2025-05-29T12:53:09.4260872Z [36;1m  [0m
+2025-05-29T12:53:09.4261116Z [36;1m  # Don't fail the workflow even if we only have a fallback report[0m
+2025-05-29T12:53:09.4261570Z [36;1m  Write-Host "[INFO] Security scan completed - check reports for results"[0m
+2025-05-29T12:53:09.4261895Z [36;1m} else {[0m
+2025-05-29T12:53:09.4262123Z [36;1m  Write-Host "[ERROR] No report files were generated"[0m
+2025-05-29T12:53:09.4262399Z [36;1m  exit 1[0m
+2025-05-29T12:53:09.4262541Z [36;1m}[0m
+2025-05-29T12:53:09.4295715Z shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.EXE -command ". '{0}'"
+2025-05-29T12:53:09.4296083Z env:
+2025-05-29T12:53:09.4296265Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T12:53:09.4296528Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T12:53:09.4296768Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T12:53:09.4297015Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T12:53:09.4297255Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T12:53:09.4297587Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T12:53:09.4297968Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T12:53:09.4298347Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T12:53:09.4298793Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:53:09.4299243Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T12:53:09.4299575Z ##[endgroup]
+2025-05-29T12:53:09.6651657Z 
+2025-05-29T12:53:09.6652970Z 
+2025-05-29T12:53:09.6655722Z     Directory: D:\a\MVCTodo\MVCTodo
+2025-05-29T12:53:09.6656064Z 
+2025-05-29T12:53:09.6656070Z 
+2025-05-29T12:53:09.6666511Z Mode                 LastWriteTime         Length Name                                                                 
+2025-05-29T12:53:09.6670789Z ----                 -------------         ------ ----                                                                 
+2025-05-29T12:53:09.6680408Z d-----         5/29/2025  12:53 PM                odc-reports                                                          
+2025-05-29T12:53:09.7303851Z [SUCCESS] Created report directory: odc-reports
+2025-05-29T12:53:09.7311624Z [INFO] Starting OWASP Dependency Check scan...
+2025-05-29T12:53:09.7319075Z [INFO] Project: Todo MVC Security Scan
+2025-05-29T12:53:09.7327525Z [INFO] CVSS Threshold: >= 7.0 (High/Critical)
+2025-05-29T12:53:09.8198998Z [INFO] Found 11 cached NVD files (0.66 MB)
+2025-05-29T12:53:09.8212235Z [WARNING] Cache appears corrupted or incomplete (0.66 MB < 10 MB expected)
+2025-05-29T12:53:09.8219664Z [INFO] Clearing corrupted cache to force fresh download...
+2025-05-29T12:53:09.8271772Z 
+2025-05-29T12:53:09.8273302Z 
+2025-05-29T12:53:09.8275588Z     Directory: C:\Users\runneradmin
+2025-05-29T12:53:09.8275834Z 
+2025-05-29T12:53:09.8275872Z 
+2025-05-29T12:53:09.8287711Z Mode                 LastWriteTime         Length Name                                                                 
+2025-05-29T12:53:09.8292737Z ----                 -------------         ------ ----                                                                 
+2025-05-29T12:53:09.8303751Z d-----         5/29/2025  12:53 PM                odc-data                                                             
+2025-05-29T12:53:09.8311307Z [SUCCESS] Cleared corrupted cache, will download fresh NVD data
+2025-05-29T12:53:09.8318850Z [INFO] Cache Status: MISS - Will download NVD data
+2025-05-29T12:53:09.8326321Z [INFO] Using public NVD API access (no API key configured)
+2025-05-29T12:53:09.8333663Z [INFO] Updates will be slower due to rate limiting, but fully functional
+2025-05-29T12:53:09.8341330Z [INFO] Attempting scan with NVD database updates...
+2025-05-29T12:53:26.1318317Z [INFO] Checking for updates
+2025-05-29T12:53:26.2033737Z [WARN] An NVD API Key was not provided - it is highly recommended to use an NVD API key as the update can take a VERY long time without an API Key
+2025-05-29T12:53:32.9589989Z [INFO] NVD API has 295,903 records in this update
+2025-05-29T12:54:08.5465397Z [INFO] Downloaded 10,000/295,903 (3%)
+2025-05-29T12:54:58.3393984Z [INFO] Downloaded 20,000/295,903 (7%)
+2025-05-29T12:55:48.7190274Z [INFO] Downloaded 30,000/295,903 (10%)
+2025-05-29T12:56:38.9365568Z [INFO] Downloaded 40,000/295,903 (14%)
+2025-05-29T12:57:28.9038426Z [INFO] Downloaded 50,000/295,903 (17%)
+2025-05-29T12:58:21.2185298Z [INFO] Downloaded 60,000/295,903 (20%)
+2025-05-29T12:59:09.0322878Z [INFO] Downloaded 70,000/295,903 (24%)
+2025-05-29T12:59:58.7929710Z [INFO] Downloaded 80,000/295,903 (27%)
+2025-05-29T13:00:48.2248345Z [INFO] Downloaded 90,000/295,903 (30%)
+2025-05-29T13:01:39.0128839Z [INFO] Downloaded 100,000/295,903 (34%)
+2025-05-29T13:02:29.2104532Z [INFO] Downloaded 110,000/295,903 (37%)
+2025-05-29T13:03:18.8174823Z [INFO] Downloaded 120,000/295,903 (41%)
+2025-05-29T13:04:09.0585310Z [INFO] Downloaded 130,000/295,903 (44%)
+2025-05-29T13:04:59.3648562Z [INFO] Downloaded 140,000/295,903 (47%)
+2025-05-29T13:05:49.3407705Z [INFO] Downloaded 150,000/295,903 (51%)
+2025-05-29T13:06:39.8143090Z [INFO] Downloaded 160,000/295,903 (54%)
+2025-05-29T13:07:29.2915557Z [INFO] Downloaded 170,000/295,903 (57%)
+2025-05-29T13:08:19.7653052Z [INFO] Downloaded 180,000/295,903 (61%)
+2025-05-29T13:09:09.1931648Z [INFO] Downloaded 190,000/295,903 (64%)
+2025-05-29T13:09:59.4721970Z [INFO] Downloaded 200,000/295,903 (68%)
+2025-05-29T13:10:49.1188958Z [INFO] Downloaded 210,000/295,903 (71%)
+2025-05-29T13:11:39.9690037Z [INFO] Downloaded 220,000/295,903 (74%)
+2025-05-29T13:12:29.1532825Z [INFO] Downloaded 230,000/295,903 (78%)
+2025-05-29T13:13:19.3716016Z [INFO] Downloaded 240,000/295,903 (81%)
+2025-05-29T13:14:09.5188424Z [INFO] Downloaded 250,000/295,903 (84%)
+2025-05-29T13:14:59.8407338Z [INFO] Downloaded 260,000/295,903 (88%)
+2025-05-29T13:15:50.0449547Z [INFO] Downloaded 270,000/295,906 (91%)
+2025-05-29T13:16:40.0230539Z [INFO] Downloaded 280,000/295,906 (95%)
+2025-05-29T13:17:29.5691592Z [INFO] Downloaded 290,000/295,906 (98%)
+2025-05-29T13:17:59.7527537Z [INFO] Downloaded 295,906/295,906 (100%)
+2025-05-29T13:17:59.7532327Z [INFO] Completed processing batch 1/148 (1%) in 1,881ms
+2025-05-29T13:17:59.7544668Z [INFO] Completed processing batch 2/148 (1%) in 1,236ms
+2025-05-29T13:17:59.7545645Z [INFO] Completed processing batch 3/148 (2%) in 1,157ms
+2025-05-29T13:17:59.7551462Z [INFO] Completed processing batch 4/148 (3%) in 1,157ms
+2025-05-29T13:17:59.7554511Z [INFO] Completed processing batch 5/148 (3%) in 1,423ms
+2025-05-29T13:17:59.7555289Z [INFO] Completed processing batch 6/148 (4%) in 1,198ms
+2025-05-29T13:17:59.7556040Z [INFO] Completed processing batch 7/148 (5%) in 939ms
+2025-05-29T13:17:59.7556797Z [INFO] Completed processing batch 8/148 (5%) in 946ms
+2025-05-29T13:17:59.7557477Z [INFO] Completed processing batch 9/148 (6%) in 986ms
+2025-05-29T13:17:59.7598962Z [INFO] Completed processing batch 10/148 (7%) in 1,001ms
+2025-05-29T13:17:59.7599877Z [INFO] Completed processing batch 11/148 (7%) in 903ms
+2025-05-29T13:17:59.7600606Z [INFO] Completed processing batch 12/148 (8%) in 864ms
+2025-05-29T13:17:59.7601265Z [INFO] Completed processing batch 13/148 (9%) in 894ms
+2025-05-29T13:17:59.7601915Z [INFO] Completed processing batch 14/148 (9%) in 925ms
+2025-05-29T13:17:59.7633665Z [INFO] Completed processing batch 15/148 (10%) in 911ms
+2025-05-29T13:17:59.7652488Z [INFO] Completed processing batch 16/148 (11%) in 1,080ms
+2025-05-29T13:17:59.7656276Z [INFO] Completed processing batch 17/148 (11%) in 1,148ms
+2025-05-29T13:17:59.7657207Z [INFO] Completed processing batch 18/148 (12%) in 1,189ms
+2025-05-29T13:17:59.7659092Z [INFO] Completed processing batch 19/148 (13%) in 1,266ms
+2025-05-29T13:17:59.7659896Z [INFO] Completed processing batch 20/148 (14%) in 1,736ms
+2025-05-29T13:17:59.7660653Z [INFO] Completed processing batch 21/148 (14%) in 1,381ms
+2025-05-29T13:17:59.7661425Z [INFO] Completed processing batch 22/148 (15%) in 1,282ms
+2025-05-29T13:17:59.7662177Z [INFO] Completed processing batch 23/148 (16%) in 2,229ms
+2025-05-29T13:17:59.7662952Z [INFO] Completed processing batch 24/148 (16%) in 2,056ms
+2025-05-29T13:17:59.7663689Z [INFO] Completed processing batch 25/148 (17%) in 1,433ms
+2025-05-29T13:17:59.7664452Z [INFO] Completed processing batch 26/148 (18%) in 1,703ms
+2025-05-29T13:17:59.7665242Z [INFO] Completed processing batch 27/148 (18%) in 2,079ms
+2025-05-29T13:17:59.7666061Z [INFO] Completed processing batch 28/148 (19%) in 1,631ms
+2025-05-29T13:17:59.7666817Z [INFO] Completed processing batch 29/148 (20%) in 1,843ms
+2025-05-29T13:17:59.7667592Z [INFO] Completed processing batch 30/148 (20%) in 1,239ms
+2025-05-29T13:17:59.7668343Z [INFO] Completed processing batch 31/148 (21%) in 1,798ms
+2025-05-29T13:17:59.7669078Z [INFO] Completed processing batch 32/148 (22%) in 1,271ms
+2025-05-29T13:17:59.7670879Z [INFO] Completed processing batch 33/148 (22%) in 921ms
+2025-05-29T13:17:59.7671529Z [INFO] Completed processing batch 34/148 (23%) in 969ms
+2025-05-29T13:17:59.7672197Z [INFO] Completed processing batch 35/148 (24%) in 1,392ms
+2025-05-29T13:17:59.7672837Z [INFO] Completed processing batch 36/148 (24%) in 805ms
+2025-05-29T13:17:59.7673438Z [INFO] Completed processing batch 37/148 (25%) in 1,191ms
+2025-05-29T13:17:59.7674052Z [INFO] Completed processing batch 38/148 (26%) in 922ms
+2025-05-29T13:17:59.7674688Z [INFO] Completed processing batch 39/148 (26%) in 1,249ms
+2025-05-29T13:17:59.7675359Z [INFO] Completed processing batch 40/148 (27%) in 746ms
+2025-05-29T13:17:59.7675989Z [INFO] Completed processing batch 41/148 (28%) in 846ms
+2025-05-29T13:17:59.7676627Z [INFO] Completed processing batch 42/148 (28%) in 1,005ms
+2025-05-29T13:17:59.7677284Z [INFO] Completed processing batch 43/148 (29%) in 777ms
+2025-05-29T13:17:59.7677869Z [INFO] Completed processing batch 44/148 (30%) in 140ms
+2025-05-29T13:17:59.7678505Z [INFO] Completed processing batch 45/148 (30%) in 214ms
+2025-05-29T13:17:59.7679145Z [INFO] Completed processing batch 46/148 (31%) in 1,173ms
+2025-05-29T13:17:59.7679770Z [INFO] Completed processing batch 47/148 (32%) in 718ms
+2025-05-29T13:17:59.7680364Z [INFO] Completed processing batch 48/148 (32%) in 1,259ms
+2025-05-29T13:17:59.7680975Z [INFO] Completed processing batch 49/148 (33%) in 632ms
+2025-05-29T13:17:59.7681579Z [INFO] Completed processing batch 50/148 (34%) in 932ms
+2025-05-29T13:17:59.7682377Z [INFO] Completed processing batch 51/148 (34%) in 600ms
+2025-05-29T13:17:59.7682995Z [INFO] Completed processing batch 52/148 (35%) in 368ms
+2025-05-29T13:17:59.7683597Z [INFO] Completed processing batch 53/148 (36%) in 968ms
+2025-05-29T13:17:59.7684202Z [INFO] Completed processing batch 54/148 (36%) in 590ms
+2025-05-29T13:17:59.7684786Z [INFO] Completed processing batch 55/148 (37%) in 1,060ms
+2025-05-29T13:17:59.7685393Z [INFO] Completed processing batch 56/148 (38%) in 587ms
+2025-05-29T13:17:59.7685983Z [INFO] Completed processing batch 57/148 (39%) in 537ms
+2025-05-29T13:17:59.7686584Z [INFO] Completed processing batch 58/148 (39%) in 961ms
+2025-05-29T13:17:59.7687192Z [INFO] Completed processing batch 59/148 (40%) in 516ms
+2025-05-29T13:17:59.7687798Z [INFO] Completed processing batch 60/148 (41%) in 427ms
+2025-05-29T13:17:59.7688402Z [INFO] Completed processing batch 61/148 (41%) in 1,252ms
+2025-05-29T13:17:59.7689059Z [INFO] Completed processing batch 62/148 (42%) in 645ms
+2025-05-29T13:17:59.7689687Z [INFO] Completed processing batch 63/148 (43%) in 541ms
+2025-05-29T13:17:59.7690294Z [INFO] Completed processing batch 64/148 (43%) in 559ms
+2025-05-29T13:17:59.7690873Z [INFO] Completed processing batch 65/148 (44%) in 584ms
+2025-05-29T13:17:59.7691493Z [INFO] Completed processing batch 66/148 (45%) in 563ms
+2025-05-29T13:17:59.7692356Z [INFO] Completed processing batch 67/148 (45%) in 532ms
+2025-05-29T13:17:59.7692937Z [INFO] Completed processing batch 68/148 (46%) in 530ms
+2025-05-29T13:17:59.7693548Z [INFO] Completed processing batch 69/148 (47%) in 581ms
+2025-05-29T13:17:59.7694163Z [INFO] Completed processing batch 70/148 (47%) in 580ms
+2025-05-29T13:17:59.7694755Z [INFO] Completed processing batch 71/148 (48%) in 531ms
+2025-05-29T13:17:59.7695322Z [INFO] Completed processing batch 72/148 (49%) in 564ms
+2025-05-29T13:17:59.7695936Z [INFO] Completed processing batch 73/148 (49%) in 918ms
+2025-05-29T13:17:59.7696580Z [INFO] Completed processing batch 74/148 (50%) in 578ms
+2025-05-29T13:17:59.7697176Z [INFO] Completed processing batch 75/148 (51%) in 524ms
+2025-05-29T13:17:59.7697801Z [INFO] Completed processing batch 76/148 (51%) in 634ms
+2025-05-29T13:17:59.7698414Z [INFO] Completed processing batch 77/148 (52%) in 479ms
+2025-05-29T13:17:59.7698996Z [INFO] Completed processing batch 78/148 (53%) in 479ms
+2025-05-29T13:17:59.7699618Z [INFO] Completed processing batch 79/148 (53%) in 476ms
+2025-05-29T13:17:59.7700240Z [INFO] Completed processing batch 80/148 (54%) in 1,146ms
+2025-05-29T13:17:59.7700861Z [INFO] Completed processing batch 81/148 (55%) in 544ms
+2025-05-29T13:17:59.7701427Z [INFO] Completed processing batch 82/148 (55%) in 666ms
+2025-05-29T13:17:59.7702025Z [INFO] Completed processing batch 83/148 (56%) in 498ms
+2025-05-29T13:17:59.7702622Z [INFO] Completed processing batch 84/148 (57%) in 609ms
+2025-05-29T13:17:59.7703186Z [INFO] Completed processing batch 85/148 (57%) in 474ms
+2025-05-29T13:17:59.7703782Z [INFO] Completed processing batch 86/148 (58%) in 577ms
+2025-05-29T13:17:59.7704385Z [INFO] Completed processing batch 87/148 (59%) in 593ms
+2025-05-29T13:17:59.7704970Z [INFO] Completed processing batch 88/148 (59%) in 524ms
+2025-05-29T13:17:59.7705529Z [INFO] Completed processing batch 89/148 (60%) in 357ms
+2025-05-29T13:17:59.7706149Z [INFO] Completed processing batch 90/148 (61%) in 586ms
+2025-05-29T13:17:59.7706759Z [INFO] Completed processing batch 91/148 (61%) in 561ms
+2025-05-29T13:17:59.7707353Z [INFO] Completed processing batch 92/148 (62%) in 530ms
+2025-05-29T13:17:59.7707986Z [INFO] Completed processing batch 93/148 (63%) in 625ms
+2025-05-29T13:17:59.7708615Z [INFO] Completed processing batch 94/148 (64%) in 547ms
+2025-05-29T13:17:59.7709228Z [INFO] Completed processing batch 95/148 (64%) in 585ms
+2025-05-29T13:17:59.7709806Z [INFO] Completed processing batch 96/148 (65%) in 546ms
+2025-05-29T13:17:59.7710405Z [INFO] Completed processing batch 97/148 (66%) in 465ms
+2025-05-29T13:17:59.7710991Z [INFO] Completed processing batch 98/148 (66%) in 503ms
+2025-05-29T13:17:59.7711854Z [INFO] Completed processing batch 99/148 (67%) in 1,015ms
+2025-05-29T13:17:59.7712465Z [INFO] Completed processing batch 100/148 (68%) in 682ms
+2025-05-29T13:17:59.7713013Z [INFO] Completed processing batch 101/148 (68%) in 484ms
+2025-05-29T13:17:59.7713624Z [INFO] Completed processing batch 102/148 (69%) in 436ms
+2025-05-29T13:17:59.7714171Z [INFO] Completed processing batch 103/148 (70%) in 941ms
+2025-05-29T13:17:59.7714714Z [INFO] Completed processing batch 104/148 (70%) in 611ms
+2025-05-29T13:17:59.7715262Z [INFO] Completed processing batch 105/148 (71%) in 403ms
+2025-05-29T13:17:59.7715770Z [INFO] Completed processing batch 106/148 (72%) in 421ms
+2025-05-29T13:17:59.7716125Z [INFO] Completed processing batch 107/148 (72%) in 536ms
+2025-05-29T13:17:59.7716493Z [INFO] Completed processing batch 108/148 (73%) in 484ms
+2025-05-29T13:17:59.7716836Z [INFO] Completed processing batch 109/148 (74%) in 627ms
+2025-05-29T13:17:59.7717206Z [INFO] Completed processing batch 110/148 (74%) in 487ms
+2025-05-29T13:17:59.7717582Z [INFO] Completed processing batch 111/148 (75%) in 1,093ms
+2025-05-29T13:17:59.7717960Z [INFO] Completed processing batch 112/148 (76%) in 532ms
+2025-05-29T13:17:59.7718282Z [INFO] Completed processing batch 113/148 (76%) in 437ms
+2025-05-29T13:17:59.7718785Z [INFO] Completed processing batch 114/148 (77%) in 558ms
+2025-05-29T13:17:59.7719142Z [INFO] Completed processing batch 115/148 (78%) in 570ms
+2025-05-29T13:17:59.7719466Z [INFO] Completed processing batch 116/148 (78%) in 645ms
+2025-05-29T13:17:59.7719807Z [INFO] Completed processing batch 117/148 (79%) in 546ms
+2025-05-29T13:17:59.7720148Z [INFO] Completed processing batch 118/148 (80%) in 519ms
+2025-05-29T13:17:59.7720489Z [INFO] Completed processing batch 119/148 (80%) in 523ms
+2025-05-29T13:17:59.7720805Z [INFO] Completed processing batch 120/148 (81%) in 492ms
+2025-05-29T13:17:59.7721144Z [INFO] Completed processing batch 121/148 (82%) in 378ms
+2025-05-29T13:17:59.7721489Z [INFO] Completed processing batch 122/148 (82%) in 265ms
+2025-05-29T13:17:59.7721807Z [INFO] Completed processing batch 123/148 (83%) in 281ms
+2025-05-29T13:17:59.7722147Z [INFO] Completed processing batch 124/148 (84%) in 184ms
+2025-05-29T13:17:59.7722490Z [INFO] Completed processing batch 125/148 (84%) in 814ms
+2025-05-29T13:17:59.7722810Z [INFO] Completed processing batch 126/148 (85%) in 202ms
+2025-05-29T13:17:59.7723150Z [INFO] Completed processing batch 127/148 (86%) in 441ms
+2025-05-29T13:17:59.7723489Z [INFO] Completed processing batch 128/148 (86%) in 383ms
+2025-05-29T13:17:59.7723827Z [INFO] Completed processing batch 129/148 (87%) in 338ms
+2025-05-29T13:17:59.7724145Z [INFO] Completed processing batch 130/148 (88%) in 393ms
+2025-05-29T13:17:59.7724489Z [INFO] Completed processing batch 131/148 (89%) in 447ms
+2025-05-29T13:17:59.7724826Z [INFO] Completed processing batch 132/148 (89%) in 377ms
+2025-05-29T13:17:59.7725140Z [INFO] Completed processing batch 133/148 (90%) in 404ms
+2025-05-29T13:17:59.7725484Z [INFO] Completed processing batch 134/148 (91%) in 399ms
+2025-05-29T13:17:59.7725821Z [INFO] Completed processing batch 135/148 (91%) in 313ms
+2025-05-29T13:17:59.7726160Z [INFO] Completed processing batch 136/148 (92%) in 673ms
+2025-05-29T13:17:59.7726476Z [INFO] Completed processing batch 137/148 (93%) in 178ms
+2025-05-29T13:17:59.7726822Z [INFO] Completed processing batch 138/148 (93%) in 194ms
+2025-05-29T13:17:59.7727172Z [INFO] Completed processing batch 139/148 (94%) in 156ms
+2025-05-29T13:17:59.7727491Z [INFO] Completed processing batch 140/148 (95%) in 198ms
+2025-05-29T13:17:59.7727833Z [INFO] Completed processing batch 141/148 (95%) in 307ms
+2025-05-29T13:17:59.7728172Z [INFO] Completed processing batch 142/148 (96%) in 179ms
+2025-05-29T13:17:59.7728493Z [INFO] Completed processing batch 143/148 (97%) in 222ms
+2025-05-29T13:17:59.7728835Z [INFO] Completed processing batch 144/148 (97%) in 140ms
+2025-05-29T13:17:59.7729179Z [INFO] Completed processing batch 145/148 (98%) in 259ms
+2025-05-29T13:17:59.7730330Z [INFO] Completed processing batch 146/148 (99%) in 172ms
+2025-05-29T13:17:59.7730697Z [INFO] Completed processing batch 147/148 (99%) in 152ms
+2025-05-29T13:17:59.8108677Z [INFO] Completed processing batch 148/148 (100%) in 125ms
+2025-05-29T13:18:00.3948539Z [INFO] Updating CISA Known Exploited Vulnerability list: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+2025-05-29T13:18:00.6687136Z [INFO] Begin database defrag
+2025-05-29T13:18:07.1648758Z [INFO] End database defrag (6504 ms)
+2025-05-29T13:18:07.1662480Z [INFO] Check for updates complete (1481035 ms)
+2025-05-29T13:18:07.3440233Z [INFO] 
+2025-05-29T13:18:07.3440856Z 
+2025-05-29T13:18:07.3447671Z Dependency-Check is an open source tool performing a best effort analysis of 3rd party dependencies; false positives and false negatives may exist in the analysis performed by the tool. Use of the tool and the reporting provided constitutes acceptance for use in an AS IS condition, and there are NO warranties, implied or otherwise, with regard to the analysis or its use. Any use of the tool and the reporting provided is at the user's risk. In no event shall the copyright holder or OWASP be held liable for any damages whatsoever arising out of or in connection with the use of this tool, the analysis performed, or the resulting report.
+2025-05-29T13:18:07.3487331Z 
+2025-05-29T13:18:07.3487341Z 
+2025-05-29T13:18:07.3487836Z    About ODC: https://dependency-check.github.io/DependencyCheck/general/internals.html
+2025-05-29T13:18:07.3489035Z    False Positives: https://dependency-check.github.io/DependencyCheck/general/suppression.html
+2025-05-29T13:18:07.3489704Z 
+2025-05-29T13:18:07.3489962Z ? Sponsor: https://github.com/sponsors/jeremylong
+2025-05-29T13:18:07.3490277Z 
+2025-05-29T13:18:07.3490285Z 
+2025-05-29T13:18:07.3490422Z [INFO] Analysis Started
+2025-05-29T13:18:14.0403369Z [INFO] Finished Archive Analyzer (6 seconds)
+2025-05-29T13:18:14.0730608Z [INFO] Finished File Name Analyzer (0 seconds)
+2025-05-29T13:18:15.2782085Z [INFO] Finished Jar Analyzer (1 seconds)
+2025-05-29T13:18:19.7861443Z [INFO] Finished Central Analyzer (4 seconds)
+2025-05-29T13:18:19.7912517Z [INFO] Finished MSBuild Project Analyzer (0 seconds)
+2025-05-29T13:18:45.8107693Z [INFO] Finished Assembly Analyzer (26 seconds)
+2025-05-29T13:18:45.8130683Z [INFO] Finished Python Distribution Analyzer (0 seconds)
+2025-05-29T13:18:45.8140584Z [INFO] Finished PE Analyzer (0 seconds)
+2025-05-29T13:18:45.8306093Z [INFO] Finished Dependency Merging Analyzer (0 seconds)
+2025-05-29T13:18:45.9251008Z [INFO] Finished Hint Analyzer (0 seconds)
+2025-05-29T13:18:45.9304443Z [INFO] Finished Version Filter Analyzer (0 seconds)
+2025-05-29T13:18:47.4409818Z [INFO] Created CPE Index (1 seconds)
+2025-05-29T13:18:47.6242938Z [INFO] Finished NPM CPE Analyzer (1 seconds)
+2025-05-29T13:18:48.9849280Z [INFO] Created CPE Index (1 seconds)
+2025-05-29T13:18:51.8754732Z [INFO] Finished CPE Analyzer (4 seconds)
+2025-05-29T13:18:51.8821869Z [INFO] Finished False Positive Analyzer (0 seconds)
+2025-05-29T13:18:51.9409261Z [INFO] Finished NVD CVE Analyzer (0 seconds)
+2025-05-29T13:18:53.0601653Z [INFO] Finished RetireJS Analyzer (1 seconds)
+2025-05-29T13:18:54.6002765Z [INFO] Finished Sonatype OSS Index Analyzer (1 seconds)
+2025-05-29T13:18:54.6064377Z [INFO] Finished Vulnerability Suppression Analyzer (0 seconds)
+2025-05-29T13:18:54.6198256Z [INFO] Finished Known Exploited Vulnerability Analyzer (0 seconds)
+2025-05-29T13:18:54.6504284Z [INFO] Finished Dependency Bundling Analyzer (0 seconds)
+2025-05-29T13:18:54.6523551Z [INFO] Finished Unused Suppression Rule Analyzer (0 seconds)
+2025-05-29T13:18:55.6986184Z [INFO] Analysis Complete (48 seconds)
+2025-05-29T13:18:55.7708798Z [INFO] Writing XML report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.xml
+2025-05-29T13:18:56.0371853Z [INFO] Writing HTML report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.html
+2025-05-29T13:18:56.2550950Z [INFO] Writing JSON report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.json
+2025-05-29T13:18:56.3557925Z [INFO] Writing CSV report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.csv
+2025-05-29T13:18:56.3619181Z [INFO] Writing SARIF report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.sarif
+2025-05-29T13:18:56.3845845Z [INFO] Writing JENKINS report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-jenkins.html
+2025-05-29T13:18:56.4020650Z [INFO] Writing JUNIT report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-junit.xml
+2025-05-29T13:18:56.4288540Z [INFO] Writing GITLAB report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-gitlab.json
+2025-05-29T13:18:56.4386429Z [ERROR] 
+2025-05-29T13:18:56.4386805Z 
+2025-05-29T13:18:56.4392383Z One or more dependencies were identified with vulnerabilities that have a CVSS score greater than or equal to '7.0': 
+2025-05-29T13:18:56.4393301Z 
+2025-05-29T13:18:56.4394403Z dependency-check.zip: commons-beanutils-1.9.4.jar (pkg:maven/commons-beanutils/commons-beanutils@1.9.4, cpe:2.3:a:apache:commons_beanutils:1.9.4:*:*:*:*:*:*:*): CVE-2025-48734(8.800000190734863)
+2025-05-29T13:18:56.4395657Z 
+2025-05-29T13:18:56.4410598Z See the dependency-check report for more details.
+2025-05-29T13:18:56.4411509Z 
+2025-05-29T13:18:56.4411585Z 
+2025-05-29T13:18:56.7237956Z [ERROR] First attempt failed: Dependency check failed with exit code: 15
+2025-05-29T13:18:56.7245499Z [INFO] Attempting fallback scan without NVD updates...
+2025-05-29T13:18:58.9457337Z [INFO] 
+2025-05-29T13:18:58.9457627Z 
+2025-05-29T13:18:58.9460839Z Dependency-Check is an open source tool performing a best effort analysis of 3rd party dependencies; false positives and false negatives may exist in the analysis performed by the tool. Use of the tool and the reporting provided constitutes acceptance for use in an AS IS condition, and there are NO warranties, implied or otherwise, with regard to the analysis or its use. Any use of the tool and the reporting provided is at the user's risk. In no event shall the copyright holder or OWASP be held liable for any damages whatsoever arising out of or in connection with the use of this tool, the analysis performed, or the resulting report.
+2025-05-29T13:18:58.9464573Z 
+2025-05-29T13:18:58.9464601Z 
+2025-05-29T13:18:58.9465105Z    About ODC: https://dependency-check.github.io/DependencyCheck/general/internals.html
+2025-05-29T13:18:58.9466298Z    False Positives: https://dependency-check.github.io/DependencyCheck/general/suppression.html
+2025-05-29T13:18:58.9466979Z 
+2025-05-29T13:18:58.9467217Z ? Sponsor: https://github.com/sponsors/jeremylong
+2025-05-29T13:18:58.9467600Z 
+2025-05-29T13:18:58.9467607Z 
+2025-05-29T13:18:58.9467756Z [INFO] Analysis Started
+2025-05-29T13:19:01.9657444Z [INFO] Finished Archive Analyzer (3 seconds)
+2025-05-29T13:19:02.0059145Z [INFO] Finished File Name Analyzer (0 seconds)
+2025-05-29T13:19:02.9872806Z [INFO] Finished Jar Analyzer (0 seconds)
+2025-05-29T13:19:03.0841588Z [INFO] Finished Central Analyzer (0 seconds)
+2025-05-29T13:19:03.1064016Z [INFO] Finished MSBuild Project Analyzer (0 seconds)
+2025-05-29T13:19:03.5912770Z [INFO] Finished Assembly Analyzer (0 seconds)
+2025-05-29T13:19:03.5938885Z [INFO] Finished Python Distribution Analyzer (0 seconds)
+2025-05-29T13:19:03.5958884Z [INFO] Finished PE Analyzer (0 seconds)
+2025-05-29T13:19:03.6210603Z [INFO] Finished Dependency Merging Analyzer (0 seconds)
+2025-05-29T13:19:03.6982176Z [INFO] Finished Hint Analyzer (0 seconds)
+2025-05-29T13:19:03.7053549Z [INFO] Finished Version Filter Analyzer (0 seconds)
+2025-05-29T13:19:05.7457027Z [INFO] Created CPE Index (2 seconds)
+2025-05-29T13:19:05.9266255Z [INFO] Finished NPM CPE Analyzer (2 seconds)
+2025-05-29T13:19:07.5331952Z [INFO] Created CPE Index (1 seconds)
+2025-05-29T13:19:10.1910033Z [INFO] Finished CPE Analyzer (4 seconds)
+2025-05-29T13:19:10.1985769Z [INFO] Finished False Positive Analyzer (0 seconds)
+2025-05-29T13:19:10.2803666Z [INFO] Finished NVD CVE Analyzer (0 seconds)
+2025-05-29T13:19:11.5001587Z [INFO] Finished RetireJS Analyzer (1 seconds)
+2025-05-29T13:19:11.6503438Z [INFO] Finished Sonatype OSS Index Analyzer (0 seconds)
+2025-05-29T13:19:11.6755389Z [INFO] Finished Vulnerability Suppression Analyzer (0 seconds)
+2025-05-29T13:19:11.6915343Z [INFO] Finished Known Exploited Vulnerability Analyzer (0 seconds)
+2025-05-29T13:19:11.7189401Z [INFO] Finished Dependency Bundling Analyzer (0 seconds)
+2025-05-29T13:19:11.7222179Z [INFO] Finished Unused Suppression Rule Analyzer (0 seconds)
+2025-05-29T13:19:12.7808477Z [INFO] Analysis Complete (13 seconds)
+2025-05-29T13:19:12.8374197Z [INFO] Writing XML report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.xml
+2025-05-29T13:19:13.0985926Z [INFO] Writing HTML report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.html
+2025-05-29T13:19:13.2540912Z [INFO] Writing JSON report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.json
+2025-05-29T13:19:13.3341137Z [INFO] Writing CSV report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.csv
+2025-05-29T13:19:13.3430054Z [INFO] Writing SARIF report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-report.sarif
+2025-05-29T13:19:13.3611760Z [INFO] Writing JENKINS report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-jenkins.html
+2025-05-29T13:19:13.3810419Z [INFO] Writing JUNIT report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-junit.xml
+2025-05-29T13:19:13.3996500Z [INFO] Writing GITLAB report to: D:\a\MVCTodo\MVCTodo\odc-reports\dependency-check-gitlab.json
+2025-05-29T13:19:13.4097005Z [ERROR] 
+2025-05-29T13:19:13.4097365Z 
+2025-05-29T13:19:13.4098058Z One or more dependencies were identified with vulnerabilities that have a CVSS score greater than or equal to '7.0': 
+2025-05-29T13:19:13.4098908Z 
+2025-05-29T13:19:13.4100318Z dependency-check.zip: commons-beanutils-1.9.4.jar (pkg:maven/commons-beanutils/commons-beanutils@1.9.4, cpe:2.3:a:apache:commons_beanutils:1.9.4:*:*:*:*:*:*:*): CVE-2025-48734(8.800000190734863)
+2025-05-29T13:19:13.4104555Z 
+2025-05-29T13:19:13.4108485Z See the dependency-check report for more details.
+2025-05-29T13:19:13.4108931Z 
+2025-05-29T13:19:13.4108939Z 
+2025-05-29T13:19:13.5186697Z [ERROR] Both scan attempts failed
+2025-05-29T13:19:13.5193401Z [ERROR] NVD API error and fallback scan error: Fallback scan also failed with exit code: 15
+2025-05-29T13:19:13.5200184Z [INFO] Attempting absolute minimal scan with no external dependencies...
+2025-05-29T13:19:15.5387930Z [ERROR] One or more fatal errors occurred
+2025-05-29T13:19:15.5388655Z [ERROR] Autoupdate is disabled and the database does not exist
+2025-05-29T13:19:15.5896947Z [ERROR] All scan attempts failed - creating fallback report
+2025-05-29T13:19:15.5903654Z [ERROR] Final error: Minimal scan failed with exit code: 13
+2025-05-29T13:19:15.5910301Z [INFO] Creating basic scan report as fallback...
+2025-05-29T13:19:15.5996675Z [INFO] Created fallback report: odc-reports\dependency-check-report.html
+2025-05-29T13:19:15.6012152Z [SUCCESS] Generated 8 report files:
+2025-05-29T13:19:15.6059631Z   - dependency-check-gitlab.json (0.01 MB)
+2025-05-29T13:19:15.6067397Z   - dependency-check-jenkins.html (0.05 MB)
+2025-05-29T13:19:15.6074759Z   - dependency-check-junit.xml (0.04 MB)
+2025-05-29T13:19:15.6082127Z   - dependency-check-report.csv (0.01 MB)
+2025-05-29T13:19:15.6089636Z   - dependency-check-report.html (0 MB)
+2025-05-29T13:19:15.6097026Z   - dependency-check-report.json (0.53 MB)
+2025-05-29T13:19:15.6104330Z   - dependency-check-report.sarif (0.06 MB)
+2025-05-29T13:19:15.6111777Z   - dependency-check-report.xml (0.61 MB)
+2025-05-29T13:19:15.6119009Z [INFO] Security scan completed - check reports for results
+2025-05-29T13:19:15.6133514Z 
+2025-05-29T13:19:15.6134310Z 
+2025-05-29T13:19:15.6297771Z ##[error]Process completed with exit code 1.
+2025-05-29T13:19:15.6435789Z ##[group]Run actions/cache/save@v4
+2025-05-29T13:19:15.6436063Z with:
+2025-05-29T13:19:15.6436334Z   path: ~/odc-data
+D:\a\MVCTodo\MVCTodo/odc-data
+%USERPROFILE%/odc-data
+
+2025-05-29T13:19:15.6436778Z   key: Windows-nvd-database-10-c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T13:19:15.6437130Z   enableCrossOsArchive: false
+2025-05-29T13:19:15.6437323Z env:
+2025-05-29T13:19:15.6437494Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T13:19:15.6437763Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T13:19:15.6437998Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T13:19:15.6438318Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T13:19:15.6438600Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T13:19:15.6438957Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T13:19:15.6439391Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T13:19:15.6439884Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T13:19:15.6440369Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:15.6440879Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:15.6441276Z ##[endgroup]
+2025-05-29T13:19:15.9293319Z [command]"C:\Program Files\Git\usr\bin\tar.exe" --posix -cf cache.tzst --exclude cache.tzst -P -C D:/a/MVCTodo/MVCTodo --files-from manifest.txt --force-local --use-compress-program "zstd -T0"
+2025-05-29T13:19:18.2658787Z Sent 5505024 of 101688687 (5.4%), 5.2 MBs/sec
+2025-05-29T13:19:19.2663061Z Sent 62980096 of 101688687 (61.9%), 29.8 MBs/sec
+2025-05-29T13:19:20.2761166Z Sent 101187584 of 101688687 (99.5%), 31.9 MBs/sec
+2025-05-29T13:19:20.6580780Z Sent 101688687 of 101688687 (100.0%), 28.5 MBs/sec
+2025-05-29T13:19:20.7556583Z Cache saved with key: Windows-nvd-database-10-c19cd0db3b440b3ed80bbe2bd8c3d624a869ab7b
+2025-05-29T13:19:20.7758005Z ##[group]Run actions/upload-artifact@v4
+2025-05-29T13:19:20.7758306Z with:
+2025-05-29T13:19:20.7758493Z   name: owasp-dependency-check-results-10
+2025-05-29T13:19:20.7758751Z   path: odc-reports/
+2025-05-29T13:19:20.7758937Z   retention-days: 30
+2025-05-29T13:19:20.7759112Z   compression-level: 6
+2025-05-29T13:19:20.7759298Z   if-no-files-found: warn
+2025-05-29T13:19:20.7759484Z   overwrite: false
+2025-05-29T13:19:20.7759655Z   include-hidden-files: false
+2025-05-29T13:19:20.7759865Z env:
+2025-05-29T13:19:20.7760039Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T13:19:20.7760289Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T13:19:20.7760529Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T13:19:20.7760772Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T13:19:20.7760999Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T13:19:20.7761323Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T13:19:20.7761733Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T13:19:20.7762110Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T13:19:20.7762558Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:20.7762997Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:20.7763326Z ##[endgroup]
+2025-05-29T13:19:21.0455825Z With the provided path, there will be 8 files uploaded
+2025-05-29T13:19:21.0461860Z Artifact name is valid!
+2025-05-29T13:19:21.0464993Z Root directory input is valid!
+2025-05-29T13:19:21.3167355Z Beginning upload of artifact content to blob storage
+2025-05-29T13:19:21.7768467Z Uploaded bytes 137297
+2025-05-29T13:19:21.8477701Z Finished uploading artifact content to blob storage!
+2025-05-29T13:19:21.8481548Z SHA256 digest of uploaded artifact zip is 71336dcc1c55d26538062274bbb98863c5aeb7ee95be33197b04f51ad7c8995e
+2025-05-29T13:19:21.8484019Z Finalizing artifact upload
+2025-05-29T13:19:21.9777395Z Artifact owasp-dependency-check-results-10.zip successfully finalized. Artifact ID 3220792341
+2025-05-29T13:19:21.9778333Z Artifact owasp-dependency-check-results-10 has been successfully uploaded! Final size is 137297 bytes. Artifact ID is 3220792341
+2025-05-29T13:19:21.9788793Z Artifact download URL: https://github.com/xuanphongit/MVCTodo/actions/runs/15324259231/artifacts/3220792341
+2025-05-29T13:19:22.0033402Z ##[group]Run actions/upload-artifact@v4
+2025-05-29T13:19:22.0033734Z with:
+2025-05-29T13:19:22.0033917Z   name: gitleaks-results-10
+2025-05-29T13:19:22.0034254Z   path: C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif
+.gitleaks.toml
+
+2025-05-29T13:19:22.0034592Z   retention-days: 30
+2025-05-29T13:19:22.0034786Z   compression-level: 6
+2025-05-29T13:19:22.0034982Z   if-no-files-found: warn
+2025-05-29T13:19:22.0035183Z   overwrite: false
+2025-05-29T13:19:22.0035364Z   include-hidden-files: false
+2025-05-29T13:19:22.0035566Z env:
+2025-05-29T13:19:22.0035751Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T13:19:22.0036011Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T13:19:22.0036268Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T13:19:22.0036527Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T13:19:22.0036771Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T13:19:22.0037141Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T13:19:22.0037540Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T13:19:22.0038102Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T13:19:22.0038580Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:22.0039037Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:22.0039382Z ##[endgroup]
+2025-05-29T13:19:22.2763302Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2025-05-29T13:19:22.2768722Z The least common ancestor is .. This will be the root directory of the artifact
+2025-05-29T13:19:22.2769223Z With the provided path, there will be 1 file uploaded
+2025-05-29T13:19:22.2776819Z Artifact name is valid!
+2025-05-29T13:19:22.2779619Z Root directory input is valid!
+2025-05-29T13:19:22.2792125Z ##[error]The rootDirectory: D:\a\MVCTodo\MVCTodo is not a parent directory of the file: C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif
+2025-05-29T13:19:22.4701213Z ##[group]Run github/codeql-action/upload-sarif@v3
+2025-05-29T13:19:22.4701611Z with:
+2025-05-29T13:19:22.4701900Z   sarif_file: odc-reports/dependency-check-report.sarif
+2025-05-29T13:19:22.4702260Z   category: owasp-dependency-check
+2025-05-29T13:19:22.4702555Z   checkout_path: D:\a\MVCTodo\MVCTodo
+2025-05-29T13:19:22.4702949Z   token: ***
+2025-05-29T13:19:22.4703166Z   matrix: null
+2025-05-29T13:19:22.4703385Z   wait-for-processing: true
+2025-05-29T13:19:22.4723099Z env:
+2025-05-29T13:19:22.4723297Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T13:19:22.4723564Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T13:19:22.4723817Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T13:19:22.4724068Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T13:19:22.4724304Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T13:19:22.4724635Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T13:19:22.4725052Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T13:19:22.4725443Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T13:19:22.4725898Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:22.4726351Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:22.4726682Z ##[endgroup]
+2025-05-29T13:19:23.7267136Z ##[group]Uploading results
+2025-05-29T13:19:23.7267955Z Processing sarif files: ["odc-reports/dependency-check-report.sarif"]
+2025-05-29T13:19:23.7278864Z Validating odc-reports/dependency-check-report.sarif
+2025-05-29T13:19:23.8435983Z Warning: 'file://D:\a\MVCTodo\MVCTodo\Todo.csproj' is not a valid URI in 'instance.runs[0].artifacts[0].location.uri'.
+2025-05-29T13:19:23.8437122Z Warning: 'file://D:\a\MVCTodo\MVCTodo\Todo.csproj' is not a valid URI in 'instance.runs[0].artifacts[1].location.uri'.
+2025-05-29T13:19:23.8438590Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation\dist\additional-methods.js' is not a valid URI in 'instance.runs[0].artifacts[2].location.uri'.
+2025-05-29T13:19:23.8440035Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation\dist\additional-methods.min.js' is not a valid URI in 'instance.runs[0].artifacts[3].location.uri'.
+2025-05-29T13:19:23.8441627Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\bootstrap\dist\js\bootstrap.bundle.js' is not a valid URI in 'instance.runs[0].artifacts[4].location.uri'.
+2025-05-29T13:19:23.8443238Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\bootstrap\dist\js\bootstrap.bundle.min.js' is not a valid URI in 'instance.runs[0].artifacts[5].location.uri'.
+2025-05-29T13:19:23.8444830Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\bootstrap\dist\js\bootstrap.esm.js' is not a valid URI in 'instance.runs[0].artifacts[6].location.uri'.
+2025-05-29T13:19:23.8446403Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\bootstrap\dist\js\bootstrap.esm.min.js' is not a valid URI in 'instance.runs[0].artifacts[7].location.uri'.
+2025-05-29T13:19:23.8448602Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\bootstrap\dist\js\bootstrap.js' is not a valid URI in 'instance.runs[0].artifacts[8].location.uri'.
+2025-05-29T13:19:23.8450047Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\bootstrap\dist\js\bootstrap.min.js' is not a valid URI in 'instance.runs[0].artifacts[9].location.uri'.
+2025-05-29T13:19:23.8452000Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check\dependency-check\lib\dependency-check-core-12.1.1.jar\GrokAssembly.zip\GrokAssembly.dll' is not a valid URI in 'instance.runs[0].artifacts[10].location.uri'.
+2025-05-29T13:19:23.8456852Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\aho-corasick-double-array-trie-1.2.3.jar' is not a valid URI in 'instance.runs[0].artifacts[11].location.uri'.
+2025-05-29T13:19:23.8462445Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\android-json-0.0.20131108.vaadin1.jar' is not a valid URI in 'instance.runs[0].artifacts[12].location.uri'.
+2025-05-29T13:19:23.8464690Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\annotations-26.0.2.jar' is not a valid URI in 'instance.runs[0].artifacts[13].location.uri'.
+2025-05-29T13:19:23.8466664Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\ant-1.10.15.jar' is not a valid URI in 'instance.runs[0].artifacts[14].location.uri'.
+2025-05-29T13:19:23.8468529Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\bcpg-jdk18on-1.78.jar' is not a valid URI in 'instance.runs[0].artifacts[15].location.uri'.
+2025-05-29T13:19:23.8470526Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\bcprov-jdk18on-1.78.jar' is not a valid URI in 'instance.runs[0].artifacts[16].location.uri'.
+2025-05-29T13:19:23.8472636Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-beanutils-1.9.4.jar' is not a valid URI in 'instance.runs[0].artifacts[17].location.uri'.
+2025-05-29T13:19:23.8474712Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-cli-1.9.0.jar' is not a valid URI in 'instance.runs[0].artifacts[18].location.uri'.
+2025-05-29T13:19:23.8476766Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-codec-1.18.0.jar' is not a valid URI in 'instance.runs[0].artifacts[19].location.uri'.
+2025-05-29T13:19:23.8478863Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-collections-3.2.2.jar' is not a valid URI in 'instance.runs[0].artifacts[20].location.uri'.
+2025-05-29T13:19:23.8481073Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-collections4-4.4.jar' is not a valid URI in 'instance.runs[0].artifacts[21].location.uri'.
+2025-05-29T13:19:23.8483268Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-compress-1.27.1.jar' is not a valid URI in 'instance.runs[0].artifacts[22].location.uri'.
+2025-05-29T13:19:23.8485388Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-dbcp2-2.13.0.jar' is not a valid URI in 'instance.runs[0].artifacts[23].location.uri'.
+2025-05-29T13:19:23.8487451Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-digester-2.1.jar' is not a valid URI in 'instance.runs[0].artifacts[24].location.uri'.
+2025-05-29T13:19:23.8489527Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-io-2.18.0.jar' is not a valid URI in 'instance.runs[0].artifacts[25].location.uri'.
+2025-05-29T13:19:23.8491566Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-jcs3-core-3.2.1.jar' is not a valid URI in 'instance.runs[0].artifacts[26].location.uri'.
+2025-05-29T13:19:23.8493564Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-lang3-3.17.0.jar' is not a valid URI in 'instance.runs[0].artifacts[27].location.uri'.
+2025-05-29T13:19:23.8494878Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-logging-1.3.4.jar' is not a valid URI in 'instance.runs[0].artifacts[28].location.uri'.
+2025-05-29T13:19:23.8495977Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-pool2-2.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[29].location.uri'.
+2025-05-29T13:19:23.8497064Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-text-1.13.0.jar' is not a valid URI in 'instance.runs[0].artifacts[30].location.uri'.
+2025-05-29T13:19:23.8498124Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-validator-1.9.0.jar' is not a valid URI in 'instance.runs[0].artifacts[31].location.uri'.
+2025-05-29T13:19:23.8499858Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\compiler-0.9.6.jar' is not a valid URI in 'instance.runs[0].artifacts[32].location.uri'.
+2025-05-29T13:19:23.8500892Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\cpe-parser-3.0.0.jar' is not a valid URI in 'instance.runs[0].artifacts[33].location.uri'.
+2025-05-29T13:19:23.8502192Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\dependency-check-core-12.1.1.jar' is not a valid URI in 'instance.runs[0].artifacts[34].location.uri'.
+2025-05-29T13:19:23.8503323Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\dependency-check-utils-12.1.1.jar' is not a valid URI in 'instance.runs[0].artifacts[35].location.uri'.
+2025-05-29T13:19:23.8504432Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\error_prone_annotations-2.36.0.jar' is not a valid URI in 'instance.runs[0].artifacts[36].location.uri'.
+2025-05-29T13:19:23.8505501Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\failureaccess-1.0.3.jar' is not a valid URI in 'instance.runs[0].artifacts[37].location.uri'.
+2025-05-29T13:19:23.8506530Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\gson-2.9.0.jar' is not a valid URI in 'instance.runs[0].artifacts[38].location.uri'.
+2025-05-29T13:19:23.8507502Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\guava-33.4.6-jre.jar' is not a valid URI in 'instance.runs[0].artifacts[39].location.uri'.
+2025-05-29T13:19:23.8508602Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\h2-2.3.232.jar\org\h2\util\data.zip\org\h2\server\web\res\table.js' is not a valid URI in 'instance.runs[0].artifacts[40].location.uri'.
+2025-05-29T13:19:23.8510199Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\h2-2.3.232.jar\org\h2\util\data.zip\org\h2\server\web\res\tree.js' is not a valid URI in 'instance.runs[0].artifacts[41].location.uri'.
+2025-05-29T13:19:23.8511290Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\h2-2.3.232.jar' is not a valid URI in 'instance.runs[0].artifacts[42].location.uri'.
+2025-05-29T13:19:23.8512271Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\httpclient5-5.4.3.jar' is not a valid URI in 'instance.runs[0].artifacts[43].location.uri'.
+2025-05-29T13:19:23.8513276Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\httpcore5-5.3.4.jar' is not a valid URI in 'instance.runs[0].artifacts[44].location.uri'.
+2025-05-29T13:19:23.8514275Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\httpcore5-h2-5.3.4.jar' is not a valid URI in 'instance.runs[0].artifacts[45].location.uri'.
+2025-05-29T13:19:23.8515313Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\j2objc-annotations-3.0.0.jar' is not a valid URI in 'instance.runs[0].artifacts[46].location.uri'.
+2025-05-29T13:19:23.8516393Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jackson-core-2.18.3.jar' is not a valid URI in 'instance.runs[0].artifacts[47].location.uri'.
+2025-05-29T13:19:23.8517888Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jackson-databind-2.18.3.jar' is not a valid URI in 'instance.runs[0].artifacts[48].location.uri'.
+2025-05-29T13:19:23.8519030Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jackson-dataformat-yaml-2.18.3.jar' is not a valid URI in 'instance.runs[0].artifacts[49].location.uri'.
+2025-05-29T13:19:23.8520167Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jackson-module-blackbird-2.18.3.jar' is not a valid URI in 'instance.runs[0].artifacts[50].location.uri'.
+2025-05-29T13:19:23.8522309Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jakarta.json-2.0.1.jar' is not a valid URI in 'instance.runs[0].artifacts[51].location.uri'.
+2025-05-29T13:19:23.8523969Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jakarta.transaction-api-1.3.3.jar' is not a valid URI in 'instance.runs[0].artifacts[52].location.uri'.
+2025-05-29T13:19:23.8525395Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\javax.activation-api-1.2.0.jar' is not a valid URI in 'instance.runs[0].artifacts[53].location.uri'.
+2025-05-29T13:19:23.8527127Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\javax.inject-1.jar' is not a valid URI in 'instance.runs[0].artifacts[54].location.uri'.
+2025-05-29T13:19:23.8528851Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\javax.ws.rs-api-2.0.1.jar' is not a valid URI in 'instance.runs[0].artifacts[55].location.uri'.
+2025-05-29T13:19:23.8530217Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jaxb-api-2.3.1.jar' is not a valid URI in 'instance.runs[0].artifacts[56].location.uri'.
+2025-05-29T13:19:23.8531235Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jcs3-slf4j-1.0.5.jar' is not a valid URI in 'instance.runs[0].artifacts[57].location.uri'.
+2025-05-29T13:19:23.8532254Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jdiagnostics-1.0.7.jar' is not a valid URI in 'instance.runs[0].artifacts[58].location.uri'.
+2025-05-29T13:19:23.8533538Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jmustache-1.16.jar' is not a valid URI in 'instance.runs[0].artifacts[59].location.uri'.
+2025-05-29T13:19:23.8534570Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\joda-time-2.14.0.jar' is not a valid URI in 'instance.runs[0].artifacts[60].location.uri'.
+2025-05-29T13:19:23.8535569Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jsoup-1.19.1.jar' is not a valid URI in 'instance.runs[0].artifacts[61].location.uri'.
+2025-05-29T13:19:23.8536599Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jspecify-1.0.0.jar' is not a valid URI in 'instance.runs[0].artifacts[62].location.uri'.
+2025-05-29T13:19:23.8537580Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\jsr305-3.0.2.jar' is not a valid URI in 'instance.runs[0].artifacts[63].location.uri'.
+2025-05-29T13:19:23.8538739Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar' is not a valid URI in 'instance.runs[0].artifacts[64].location.uri'.
+2025-05-29T13:19:23.8539946Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\logback-classic-1.2.13.jar' is not a valid URI in 'instance.runs[0].artifacts[65].location.uri'.
+2025-05-29T13:19:23.8540978Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\logback-core-1.2.13.jar' is not a valid URI in 'instance.runs[0].artifacts[66].location.uri'.
+2025-05-29T13:19:23.8542044Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\lucene-analysis-common-9.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[67].location.uri'.
+2025-05-29T13:19:23.8543271Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\lucene-core-9.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[68].location.uri'.
+2025-05-29T13:19:23.8544304Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\lucene-facet-9.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[69].location.uri'.
+2025-05-29T13:19:23.8545344Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\lucene-queries-9.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[70].location.uri'.
+2025-05-29T13:19:23.8546400Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\lucene-queryparser-9.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[71].location.uri'.
+2025-05-29T13:19:23.8547542Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\lucene-sandbox-9.12.0.jar' is not a valid URI in 'instance.runs[0].artifacts[72].location.uri'.
+2025-05-29T13:19:23.8548552Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\minlog-1.3.1.jar' is not a valid URI in 'instance.runs[0].artifacts[73].location.uri'.
+2025-05-29T13:19:23.8549598Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\open-vulnerability-clients-7.3.2.jar' is not a valid URI in 'instance.runs[0].artifacts[74].location.uri'.
+2025-05-29T13:19:23.8550720Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\ossindex-service-api-1.8.2.jar' is not a valid URI in 'instance.runs[0].artifacts[75].location.uri'.
+2025-05-29T13:19:23.8551814Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\ossindex-service-client-1.8.2.jar' is not a valid URI in 'instance.runs[0].artifacts[76].location.uri'.
+2025-05-29T13:19:23.8552895Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\package-url-java-1.2.0.jar' is not a valid URI in 'instance.runs[0].artifacts[77].location.uri'.
+2025-05-29T13:19:23.8553938Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\packager-core-0.21.0.jar' is not a valid URI in 'instance.runs[0].artifacts[78].location.uri'.
+2025-05-29T13:19:23.8554959Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\packager-rpm-0.21.0.jar' is not a valid URI in 'instance.runs[0].artifacts[79].location.uri'.
+2025-05-29T13:19:23.8555989Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\packageurl-java-1.5.0.jar' is not a valid URI in 'instance.runs[0].artifacts[80].location.uri'.
+2025-05-29T13:19:23.8557003Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\pecoff4j-0.0.2.1.jar' is not a valid URI in 'instance.runs[0].artifacts[81].location.uri'.
+2025-05-29T13:19:23.8558012Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\retirejs-core-3.0.4.jar' is not a valid URI in 'instance.runs[0].artifacts[82].location.uri'.
+2025-05-29T13:19:23.8559008Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\semver4j-5.6.0.jar' is not a valid URI in 'instance.runs[0].artifacts[83].location.uri'.
+2025-05-29T13:19:23.8559990Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\slf4j-api-1.7.36.jar' is not a valid URI in 'instance.runs[0].artifacts[84].location.uri'.
+2025-05-29T13:19:23.8560972Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\snakeyaml-2.3.jar' is not a valid URI in 'instance.runs[0].artifacts[85].location.uri'.
+2025-05-29T13:19:23.8562011Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\spotbugs-annotations-4.9.3.jar' is not a valid URI in 'instance.runs[0].artifacts[86].location.uri'.
+2025-05-29T13:19:23.8563134Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\toml4j-0.7.2.jar' is not a valid URI in 'instance.runs[0].artifacts[87].location.uri'.
+2025-05-29T13:19:23.8564179Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\velocity-engine-core-2.4.1.jar' is not a valid URI in 'instance.runs[0].artifacts[88].location.uri'.
+2025-05-29T13:19:23.8565182Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\xz-1.9.jar' is not a valid URI in 'instance.runs[0].artifacts[89].location.uri'.
+2025-05-29T13:19:23.8566170Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check\dependency-check\lib\httpclient5-cache-5.4.3.jar' is not a valid URI in 'instance.runs[0].artifacts[90].location.uri'.
+2025-05-29T13:19:23.8567225Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check\dependency-check\lib\jackson-datatype-jsr310-2.18.3.jar' is not a valid URI in 'instance.runs[0].artifacts[91].location.uri'.
+2025-05-29T13:19:23.8568809Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery\dist\jquery.js' is not a valid URI in 'instance.runs[0].artifacts[92].location.uri'.
+2025-05-29T13:19:23.8569657Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery\dist\jquery.min.js' is not a valid URI in 'instance.runs[0].artifacts[93].location.uri'.
+2025-05-29T13:19:23.8570548Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation\dist\jquery.validate.js' is not a valid URI in 'instance.runs[0].artifacts[94].location.uri'.
+2025-05-29T13:19:23.8571507Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation\dist\jquery.validate.min.js' is not a valid URI in 'instance.runs[0].artifacts[95].location.uri'.
+2025-05-29T13:19:23.8572560Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation-unobtrusive\jquery.validate.unobtrusive.js' is not a valid URI in 'instance.runs[0].artifacts[96].location.uri'.
+2025-05-29T13:19:23.8573635Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation-unobtrusive\jquery.validate.unobtrusive.min.js' is not a valid URI in 'instance.runs[0].artifacts[97].location.uri'.
+2025-05-29T13:19:23.8574505Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\js\site.js' is not a valid URI in 'instance.runs[0].artifacts[98].location.uri'.
+2025-05-29T13:19:23.8575419Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation\dist\additional-methods.min.js' is not a valid URI in 'instance.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri'.
+2025-05-29T13:19:23.8576650Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\commons-beanutils-1.9.4.jar' is not a valid URI in 'instance.runs[0].results[1].locations[0].physicalLocation.artifactLocation.uri'.
+2025-05-29T13:19:23.8577812Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\h2-2.3.232.jar' is not a valid URI in 'instance.runs[0].results[2].locations[0].physicalLocation.artifactLocation.uri'.
+2025-05-29T13:19:23.8578954Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\logback-core-1.2.13.jar' is not a valid URI in 'instance.runs[0].results[3].locations[0].physicalLocation.artifactLocation.uri'.
+2025-05-29T13:19:23.8580125Z Warning: 'file://D:\a\MVCTodo\MVCTodo\dependency-check.zip\dependency-check\lib\logback-core-1.2.13.jar' is not a valid URI in 'instance.runs[0].results[4].locations[0].physicalLocation.artifactLocation.uri'.
+2025-05-29T13:19:23.8581268Z Warning: 'file://D:\a\MVCTodo\MVCTodo\wwwroot\lib\jquery-validation\dist\jquery.validate.min.js' is not a valid URI in 'instance.runs[0].results[5].locations[0].physicalLocation.artifactLocation.uri'.
+2025-05-29T13:19:23.8582966Z Adding fingerprints to SARIF file. See https://docs.github.com/en/enterprise-cloud@latest/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning#providing-data-to-track-code-scanning-alerts-across-runs for more information.
+2025-05-29T13:19:23.9576817Z Uploading results
+2025-05-29T13:19:24.2864112Z Successfully uploaded results
+2025-05-29T13:19:24.2865242Z ##[endgroup]
+2025-05-29T13:19:24.2870643Z ##[group]Waiting for processing to finish
+2025-05-29T13:19:24.5209156Z Analysis upload status is failed.
+2025-05-29T13:19:24.5210804Z ##[endgroup]
+2025-05-29T13:19:24.5224121Z ##[error]Code Scanning could not process the submitted SARIF file:
+an invalid URI was provided as a SARIF location: parse "file://D:\\a\\MVCTodo\\MVCTodo\\wwwroot\\lib\\jquery-validation\\dist\\additional-methods.min.js": invalid port ":\\a\\MVCTodo\\MVCTodo\\wwwroot\\lib\\jquery-validation\\dist\\additional-methods.min.js" after host, an invalid URI was provided as a SARIF location: parse "file://D:\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\commons-beanutils-1.9.4.jar": invalid port ":\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\commons-beanutils-1.9.4.jar" after host, an invalid URI was provided as a SARIF location: parse "file://D:\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\h2-2.3.232.jar": invalid port ":\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\h2-2.3.232.jar" after host, an invalid URI was provided as a SARIF location: parse "file://D:\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\logback-core-1.2.13.jar": invalid port ":\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\logback-core-1.2.13.jar" after host, an invalid URI was provided as a SARIF location: parse "file://D:\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\logback-core-1.2.13.jar": invalid port ":\\a\\MVCTodo\\MVCTodo\\dependency-check.zip\\dependency-check\\lib\\logback-core-1.2.13.jar" after host, an invalid URI was provided as a SARIF location: parse "file://D:\\a\\MVCTodo\\MVCTodo\\wwwroot\\lib\\jquery-validation\\dist\\jquery.validate.min.js": invalid port ":\\a\\MVCTodo\\MVCTodo\\wwwroot\\lib\\jquery-validation\\dist\\jquery.validate.min.js" after host
+2025-05-29T13:19:25.1217725Z ##[group]Run Write-Host "Creating comprehensive job summary..."
+2025-05-29T13:19:25.1218321Z [36;1mWrite-Host "Creating comprehensive job summary..."[0m
+2025-05-29T13:19:25.1218615Z [36;1m[0m
+2025-05-29T13:19:25.1218782Z [36;1m# Check if files exist[0m
+2025-05-29T13:19:25.1219367Z [36;1m$gitleaksExists = if ("C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif" -ne "") { Test-Path "C:\Users\RUNNER~1\AppData\Local\Temp\gitleaks.sarif" } else { $false }[0m
+2025-05-29T13:19:25.1219983Z [36;1m$owaspExists = Test-Path "odc-reports"[0m
+2025-05-29T13:19:25.1220225Z [36;1m[0m
+2025-05-29T13:19:25.1220394Z [36;1m# Determine GitLeaks status[0m
+2025-05-29T13:19:25.1220801Z [36;1m$gitleaksStatus = if ($gitleaksExists) { "[SUCCESS] Completed" } else { "[WARNING] No results" }[0m
+2025-05-29T13:19:25.1221334Z [36;1m$owaspStatus = if ($owaspExists) { "[SUCCESS] Completed" } else { "[ERROR] Failed" }[0m
+2025-05-29T13:19:25.1221673Z [36;1m[0m
+2025-05-29T13:19:25.1221866Z [36;1m# Get decode depth from inputs[0m
+2025-05-29T13:19:25.1222108Z [36;1m$decodeDepth = "2"[0m
+2025-05-29T13:19:25.1222319Z [36;1m$verboseMode = "false"[0m
+2025-05-29T13:19:25.1222515Z [36;1m[0m
+2025-05-29T13:19:25.1222660Z [36;1m$summary = @"[0m
+2025-05-29T13:19:25.1222866Z [36;1m## Security Scan Results - Run #10[0m
+2025-05-29T13:19:25.1223100Z [36;1m[0m
+2025-05-29T13:19:25.1223310Z [36;1m### GitLeaks v8.26.0 Secret Scanning $gitleaksStatus[0m
+2025-05-29T13:19:25.1223596Z [36;1m- **Status**: $gitleaksStatus[0m
+2025-05-29T13:19:25.1223846Z [36;1m- **Scope**: Full repository history[0m
+2025-05-29T13:19:25.1224197Z [36;1m- **Action**: gacts/gitleaks@v1 (Windows-compatible, no license required)[0m
+2025-05-29T13:19:25.1224632Z [36;1m- **Configuration**: .NET-optimized with stopwords for performance[0m
+2025-05-29T13:19:25.1224947Z [36;1m- **Features**: [0m
+2025-05-29T13:19:25.1225190Z [36;1m  - Advanced pattern detection with v8.26.0 syntax[0m
+2025-05-29T13:19:25.1225495Z [36;1m  - SARIF report generated for Security tab[0m
+2025-05-29T13:19:25.1225941Z [36;1m  - .NET-specific rules and exclusions[0m
+2025-05-29T13:19:25.1226231Z [36;1m  - Enhanced performance with modern allowlists[0m
+2025-05-29T13:19:25.1226482Z [36;1m[0m
+2025-05-29T13:19:25.1226669Z [36;1m### OWASP Dependency Check v12.1.1 $owaspStatus[0m
+2025-05-29T13:19:25.1226933Z [36;1m- **Status**: $owaspStatus[0m
+2025-05-29T13:19:25.1227158Z [36;1m- **Version**: v12.1.1 (Latest)[0m
+2025-05-29T13:19:25.1227402Z [36;1m- **Project**: Todo MVC Security Scan[0m
+2025-05-29T13:19:25.1227701Z [36;1m- **Fail Threshold**: CVSS Score >= 7.0 (High/Critical)[0m
+2025-05-29T13:19:25.1228065Z [36;1m- **NVD API**: Public Access (Rate Limited - Testing without API key)[0m
+2025-05-29T13:19:25.1228383Z [36;1m- **Reports Generated**: [0m
+2025-05-29T13:19:25.1228621Z [36;1m  - HTML Report (human-readable)[0m
+2025-05-29T13:19:25.1228876Z [36;1m  - JSON Report (machine-readable)[0m
+2025-05-29T13:19:25.1229127Z [36;1m  - XML Report (integration)[0m
+2025-05-29T13:19:25.1229389Z [36;1m  - SARIF Report (uploaded to Security tab)[0m
+2025-05-29T13:19:25.1229631Z [36;1m[0m
+2025-05-29T13:19:25.1229782Z [36;1m### View Results[0m
+2025-05-29T13:19:25.1230056Z [36;1m- **Security Tab**: Navigate to Security -> Code scanning alerts[0m
+2025-05-29T13:19:25.1230436Z [36;1m- **Artifacts**: Download scan results from this workflow run[0m
+2025-05-29T13:19:25.1230824Z [36;1m- **GitLeaks Logs**: Review secret detection details in workflow logs[0m
+2025-05-29T13:19:25.1231209Z [36;1m- **OWASP Reports**: Download detailed vulnerability reports[0m
+2025-05-29T13:19:25.1231496Z [36;1m[0m
+2025-05-29T13:19:25.1231653Z [36;1m### Workflow Controls[0m
+2025-05-29T13:19:25.1231940Z [36;1m- **Manual Trigger**: Use 'Run workflow' button for custom scans[0m
+2025-05-29T13:19:25.1232334Z [36;1m- **Configuration**: Custom .gitleaks.toml with .NET optimizations[0m
+2025-05-29T13:19:25.1234311Z [36;1m- **Scheduling**: Automatic weekly scans on Sundays[0m
+2025-05-29T13:19:25.1234638Z [36;1m[0m
+2025-05-29T13:19:25.1234802Z [36;1m### Next Steps[0m
+2025-05-29T13:19:25.1235040Z [36;1mIf vulnerabilities or secrets are found:[0m
+2025-05-29T13:19:25.1235348Z [36;1m1. Review the detailed reports in Security tab[0m
+2025-05-29T13:19:25.1235648Z [36;1m2. Download artifacts for offline analysis[0m
+2025-05-29T13:19:25.1235949Z [36;1m3. Update vulnerable dependencies immediately[0m
+2025-05-29T13:19:25.1236220Z [36;1m4. Rotate any exposed secrets[0m
+2025-05-29T13:19:25.1236451Z [36;1m5. Apply security patches[0m
+2025-05-29T13:19:25.1236700Z [36;1m6. Re-run the security scan to verify fixes[0m
+2025-05-29T13:19:25.1236938Z [36;1m[0m
+2025-05-29T13:19:25.1237093Z [36;1m### Configuration[0m
+2025-05-29T13:19:25.1237354Z [36;1m- **GitLeaks Config**: .gitleaks.toml (v8.26.0 syntax)[0m
+2025-05-29T13:19:25.1237712Z [36;1m- **OWASP Exclusions**: Build artifacts, packages, IDE files[0m
+2025-05-29T13:19:25.1238057Z [36;1m- **Caching**: Enabled for faster subsequent runs[0m
+2025-05-29T13:19:25.1238351Z [36;1m- **Retention**: Artifacts kept for 30 days[0m
+2025-05-29T13:19:25.1238601Z [36;1m"@[0m
+2025-05-29T13:19:25.1238752Z [36;1m[0m
+2025-05-29T13:19:25.1239030Z [36;1mecho $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8[0m
+2025-05-29T13:19:25.1239460Z [36;1mWrite-Host "[SUCCESS] Job summary created successfully"[0m
+2025-05-29T13:19:25.1272149Z shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.EXE -command ". '{0}'"
+2025-05-29T13:19:25.1272511Z env:
+2025-05-29T13:19:25.1272702Z   CODEQL_ACTION_FEATURE_MULTI_LANGUAGE: false
+2025-05-29T13:19:25.1272970Z   CODEQL_ACTION_FEATURE_SANDWICH: false
+2025-05-29T13:19:25.1273227Z   CODEQL_ACTION_FEATURE_SARIF_COMBINE: true
+2025-05-29T13:19:25.1273490Z   CODEQL_ACTION_FEATURE_WILL_UPLOAD: true
+2025-05-29T13:19:25.1273739Z   CODEQL_ACTION_VERSION: 3.28.18
+2025-05-29T13:19:25.1274090Z   CODEQL_ACTION_ANALYSIS_KEY: .github/workflows/security-scan.yml:security-scan
+2025-05-29T13:19:25.1274587Z   CODEQL_WORKFLOW_STARTED_AT: 2025-05-29T12:52:09.085Z
+2025-05-29T13:19:25.1274971Z   CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS: CODEQL_UPLOAD_SARIF_GITLEAKS__GITLEAKS
+2025-05-29T13:19:25.1275432Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:25.1275882Z   JAVA_HOME_11_X64: C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk\11.0.27-6\x64
+2025-05-29T13:19:25.1276477Z   CODEQL_UPLOAD_SARIF_OWASP_DEPENDENCY_CHECK__DEPENDENCY_CHECK: CODEQL_UPLOAD_SARIF_OWASP_DEPENDENCY_CHECK__DEPENDENCY_CHECK
+2025-05-29T13:19:25.1277017Z   CODEQL_ACTION_JOB_STATUS: JOB_STATUS_CONFIGURATION_ERROR
+2025-05-29T13:19:25.1277285Z ##[endgroup]
+2025-05-29T13:19:25.3497587Z Creating comprehensive job summary...
+2025-05-29T13:19:25.4085665Z [SUCCESS] Job summary created successfully
+2025-05-29T13:19:25.4349953Z Post job cleanup.
+2025-05-29T13:19:26.0471129Z ##[group]Uploading combined SARIF debug artifact
+2025-05-29T13:19:26.0474258Z ##[endgroup]
+2025-05-29T13:19:26.0712784Z Post job cleanup.
+2025-05-29T13:19:26.3029534Z Post job cleanup.
+2025-05-29T13:19:26.9022125Z ##[group]Uploading combined SARIF debug artifact
+2025-05-29T13:19:26.9024932Z ##[endgroup]
+2025-05-29T13:19:26.9249134Z Post job cleanup.
+2025-05-29T13:19:27.1388364Z [command]"C:\Program Files\Git\bin\git.exe" version
+2025-05-29T13:19:27.1598584Z git version 2.49.0.windows.1
+2025-05-29T13:19:27.1666951Z Temporarily overriding HOME='D:\a\_temp\49a2df6a-b51b-4b51-83f8-a43dd89e6bf2' before making global git config changes
+2025-05-29T13:19:27.1667630Z Adding repository directory to the temporary git global config as a safe directory
+2025-05-29T13:19:27.1678245Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\MVCTodo\MVCTodo
+2025-05-29T13:19:27.1912887Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2025-05-29T13:19:27.2176744Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2025-05-29T13:19:27.6253833Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-05-29T13:19:27.6443063Z http.https://github.com/.extraheader
+2025-05-29T13:19:27.6478637Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2025-05-29T13:19:27.6697860Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2025-05-29T13:19:28.0937528Z Cleaning up orphan processes
+Beta
+0 / 0
+used queries
+1

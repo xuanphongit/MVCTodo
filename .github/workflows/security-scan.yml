@@ -27,6 +27,11 @@ on:
         required: false
         default: false
         type: boolean
+      fail_on_vulnerabilities:
+        description: 'Fail workflow on vulnerabilities'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   security-scan:
@@ -136,6 +141,7 @@ jobs:
     # Run OWASP Dependency Check
     - name: Run OWASP Dependency Check
       shell: powershell
+      id: owasp-scan
       run: |
         $dataDir = Join-Path $env:USERPROFILE "odc-data"
         $reportDir = "odc-reports"
@@ -207,10 +213,23 @@ jobs:
           
           if ($scanResult -eq 0) {
             Write-Host "[SUCCESS] OWASP Dependency Check completed successfully with NVD updates"
+            echo "SCAN_STATUS=success" >> $env:GITHUB_OUTPUT
+            echo "VULNERABILITIES_FOUND=false" >> $env:GITHUB_OUTPUT
           } elseif ($scanResult -eq 1) {
             Write-Host "[WARNING] High-severity vulnerabilities found (CVSS >= 7.0)"
             Write-Host "[INFO] Scan completed but vulnerabilities detected"
-            # Don't exit - this is expected behavior when vulnerabilities are found
+            echo "SCAN_STATUS=success_with_vulnerabilities" >> $env:GITHUB_OUTPUT
+            echo "VULNERABILITIES_FOUND=true" >> $env:GITHUB_OUTPUT
+            
+            # Check if we should fail the workflow
+            $failOnVulns = "${{ github.event.inputs.fail_on_vulnerabilities || 'false' }}"
+            if ($failOnVulns -eq 'true') {
+              Write-Host "[ERROR] Workflow configured to fail on vulnerabilities"
+              echo "SHOULD_FAIL=true" >> $env:GITHUB_OUTPUT
+            } else {
+              Write-Host "[INFO] Continuing workflow despite vulnerabilities (fail_on_vulnerabilities=false)"
+              echo "SHOULD_FAIL=false" >> $env:GITHUB_OUTPUT
+            }
           } else {
             throw "Dependency check failed with exit code: $scanResult"
           }
@@ -228,10 +247,21 @@ jobs:
               & dependency-check.bat @dependencyCheckArgs
               $freshResult = $LASTEXITCODE
               
-              if ($freshResult -eq 0 -or $freshResult -eq 1) {
+              if ($freshResult -eq 0) {
                 Write-Host "[SUCCESS] Fresh download successful"
-                if ($freshResult -eq 1) {
-                  Write-Host "[WARNING] High-severity vulnerabilities found"
+                echo "SCAN_STATUS=success" >> $env:GITHUB_OUTPUT
+                echo "VULNERABILITIES_FOUND=false" >> $env:GITHUB_OUTPUT
+                return
+              } elseif ($freshResult -eq 1) {
+                Write-Host "[WARNING] High-severity vulnerabilities found after fresh download"
+                echo "SCAN_STATUS=success_with_vulnerabilities" >> $env:GITHUB_OUTPUT
+                echo "VULNERABILITIES_FOUND=true" >> $env:GITHUB_OUTPUT
+                
+                $failOnVulns = "${{ github.event.inputs.fail_on_vulnerabilities || 'false' }}"
+                if ($failOnVulns -eq 'true') {
+                  echo "SHOULD_FAIL=true" >> $env:GITHUB_OUTPUT
+                } else {
+                  echo "SHOULD_FAIL=false" >> $env:GITHUB_OUTPUT
                 }
                 return
               } else {
@@ -253,50 +283,33 @@ jobs:
             
             if ($fallbackResult -eq 0) {
               Write-Host "[SUCCESS] OWASP Dependency Check completed with cached data (NVD update failed)"
+              echo "SCAN_STATUS=success_cached" >> $env:GITHUB_OUTPUT
+              echo "VULNERABILITIES_FOUND=false" >> $env:GITHUB_OUTPUT
             } elseif ($fallbackResult -eq 1) {
               Write-Host "[WARNING] High-severity vulnerabilities found using cached data"
               Write-Host "[INFO] Note: Results may not include the latest vulnerability data due to NVD update failure"
+              echo "SCAN_STATUS=success_cached_with_vulnerabilities" >> $env:GITHUB_OUTPUT
+              echo "VULNERABILITIES_FOUND=true" >> $env:GITHUB_OUTPUT
+              
+              $failOnVulns = "${{ github.event.inputs.fail_on_vulnerabilities || 'false' }}"
+              if ($failOnVulns -eq 'true') {
+                echo "SHOULD_FAIL=true" >> $env:GITHUB_OUTPUT
+              } else {
+                echo "SHOULD_FAIL=false" >> $env:GITHUB_OUTPUT
+              }
             } else {
               throw "Fallback scan also failed with exit code: $fallbackResult"
             }
           } catch {
             Write-Host "[ERROR] Both scan attempts failed"
             Write-Host "[ERROR] NVD API error and fallback scan error: $_"
+            echo "SCAN_STATUS=failed" >> $env:GITHUB_OUTPUT
+            echo "VULNERABILITIES_FOUND=unknown" >> $env:GITHUB_OUTPUT
+            echo "SHOULD_FAIL=true" >> $env:GITHUB_OUTPUT
             
-            # Third attempt: Absolute minimal scan - just check what's available locally
-            Write-Host "[INFO] Attempting absolute minimal scan with no external dependencies..."
-            
-            # Create minimal scan with most basic settings
-            $absoluteMinimalArgs = @(
-              "--project", "Todo MVC Security Scan",
-              "--scan", ".",
-              "--format", "HTML",
-              "--out", $reportDir,
-              "--noupdate",
-              "--disableVersionCheck"
-            )
-            
-            try {
-              & dependency-check.bat @absoluteMinimalArgs
-              $minimalResult = $LASTEXITCODE
-              
-              # Accept any non-fatal result for minimal scan
-              if ($minimalResult -eq 0 -or $minimalResult -eq 1 -or $minimalResult -eq 2) {
-                Write-Host "[SUCCESS] Minimal scan completed with available data"
-                Write-Host "[WARNING] This scan used minimal vulnerability data - results are very limited"
-                if ($minimalResult -eq 1) {
-                  Write-Host "[INFO] Some vulnerabilities detected with limited data"
-                }
-              } else {
-                throw "Minimal scan failed with exit code: $minimalResult"
-              }
-            } catch {
-              Write-Host "[ERROR] All scan attempts failed - creating fallback report"
-              Write-Host "[ERROR] Final error: $_"
-              
-              # As last resort, generate a basic report manually
-              Write-Host "[INFO] Creating basic scan report as fallback..."
-              $basicReportContent = @"
+            # Create a manual error report
+            Write-Host "[INFO] Creating error report..."
+            $errorReportContent = @"
         <!DOCTYPE html>
         <html>
         <head>
@@ -318,18 +331,17 @@ jobs:
             <p><strong>Status:</strong> Unable to complete vulnerability scan due to NVD database corruption or connectivity issues.</p>
             <h3>Technical Details:</h3>
             <ul>
-                <li><strong>Error:</strong> NVD database corruption (exit code 13)</li>
-                <li><strong>Issue:</strong> "No documents exist" - database is empty or corrupted</li>
-                <li><strong>Cache Status:</strong> Corrupted or insufficient cached data</li>
-                <li><strong>Network:</strong> Unable to download fresh NVD data</li>
+                <li><strong>Error:</strong> Multiple scan attempts failed</li>
+                <li><strong>Issue:</strong> NVD database access issues</li>
+                <li><strong>Cache Status:</strong> Cache restoration and fresh download both failed</li>
+                <li><strong>Network:</strong> Unable to establish reliable connection to NVD services</li>
             </ul>
             <div class="recommendations">
                 <h3>Immediate Actions Required:</h3>
                 <ol>
                     <li><strong>Manual Review:</strong> Manually check dependencies against known vulnerability databases</li>
                     <li><strong>Network Check:</strong> Verify GitHub Actions runner can access nvd.nist.gov</li>
-                    <li><strong>API Key:</strong> Validate NVD API key is working correctly</li>
-                    <li><strong>Re-run:</strong> Try running the scan again in a few hours</li>
+                    <li><strong>Re-run:</strong> Try running the scan again later</li>
                     <li><strong>Alternative Tools:</strong> Consider using Snyk, WhiteSource, or other vulnerability scanners</li>
                 </ol>
                 <h3>Dependencies to Check Manually:</h3>
@@ -342,10 +354,9 @@ jobs:
         </body>
         </html>
         "@
-              $basicReportPath = Join-Path $reportDir "dependency-check-report.html"
-              $basicReportContent | Out-File -FilePath $basicReportPath -Encoding UTF8
-              Write-Host "[INFO] Created fallback report: $basicReportPath"
-            }
+            $errorReportPath = Join-Path $reportDir "dependency-check-report.html"
+            $errorReportContent | Out-File -FilePath $errorReportPath -Encoding UTF8
+            Write-Host "[INFO] Created error report: $errorReportPath"
           }
         }
         
@@ -358,11 +369,11 @@ jobs:
             Write-Host "  - $($file.Name) ($sizeMB MB)"
           }
           
-          # Don't fail the workflow even if we only have a fallback report
           Write-Host "[INFO] Security scan completed - check reports for results"
         } else {
           Write-Host "[ERROR] No report files were generated"
-          exit 1
+          echo "SCAN_STATUS=failed" >> $env:GITHUB_OUTPUT
+          echo "SHOULD_FAIL=true" >> $env:GITHUB_OUTPUT
         }
 
     # Save NVD cache data for future runs
@@ -407,6 +418,85 @@ jobs:
         category: owasp-dependency-check
       continue-on-error: true
 
+    # Analyze vulnerabilities and create detailed summary
+    - name: Analyze Vulnerability Results
+      shell: powershell
+      if: always()
+      id: vulnerability-analysis
+      run: |
+        $reportPath = "odc-reports/dependency-check-report.json"
+        $vulnerabilities = @()
+        $criticalCount = 0
+        $highCount = 0
+        $mediumCount = 0
+        $lowCount = 0
+        
+        if (Test-Path $reportPath) {
+          try {
+            $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+            
+            if ($report.dependencies) {
+              foreach ($dependency in $report.dependencies) {
+                if ($dependency.vulnerabilities) {
+                  foreach ($vuln in $dependency.vulnerabilities) {
+                    $vulnerabilities += [PSCustomObject]@{
+                      CVE = $vuln.name
+                      CVSS = if ($vuln.cvssv3) { $vuln.cvssv3.baseScore } else { $vuln.cvssv2.score }
+                      Severity = $vuln.severity
+                      Package = $dependency.fileName
+                      Description = $vuln.description
+                    }
+                    
+                    switch ($vuln.severity.ToUpper()) {
+                      "CRITICAL" { $criticalCount++ }
+                      "HIGH" { $highCount++ }
+                      "MEDIUM" { $mediumCount++ }
+                      "LOW" { $lowCount++ }
+                    }
+                  }
+                }
+              }
+            }
+            
+            echo "CRITICAL_COUNT=$criticalCount" >> $env:GITHUB_OUTPUT
+            echo "HIGH_COUNT=$highCount" >> $env:GITHUB_OUTPUT
+            echo "MEDIUM_COUNT=$mediumCount" >> $env:GITHUB_OUTPUT
+            echo "LOW_COUNT=$lowCount" >> $env:GITHUB_OUTPUT
+            echo "TOTAL_COUNT=$($vulnerabilities.Count)" >> $env:GITHUB_OUTPUT
+            
+            Write-Host "[INFO] Vulnerability Analysis Complete:"
+            Write-Host "  Critical: $criticalCount"
+            Write-Host "  High: $highCount"
+            Write-Host "  Medium: $mediumCount"
+            Write-Host "  Low: $lowCount"
+            Write-Host "  Total: $($vulnerabilities.Count)"
+            
+            # List critical and high vulnerabilities
+            $highSeverityVulns = $vulnerabilities | Where-Object { $_.Severity -in @("CRITICAL", "HIGH") }
+            if ($highSeverityVulns.Count -gt 0) {
+              Write-Host "[WARNING] High/Critical Vulnerabilities Found:"
+              foreach ($vuln in $highSeverityVulns) {
+                Write-Host "  - $($vuln.CVE) ($($vuln.Severity), CVSS: $($vuln.CVSS)) in $($vuln.Package)"
+              }
+            }
+            
+          } catch {
+            Write-Host "[ERROR] Failed to parse vulnerability report: $_"
+            echo "CRITICAL_COUNT=unknown" >> $env:GITHUB_OUTPUT
+            echo "HIGH_COUNT=unknown" >> $env:GITHUB_OUTPUT
+            echo "MEDIUM_COUNT=unknown" >> $env:GITHUB_OUTPUT
+            echo "LOW_COUNT=unknown" >> $env:GITHUB_OUTPUT
+            echo "TOTAL_COUNT=unknown" >> $env:GITHUB_OUTPUT
+          }
+        } else {
+          Write-Host "[WARNING] No JSON report found for analysis"
+          echo "CRITICAL_COUNT=0" >> $env:GITHUB_OUTPUT
+          echo "HIGH_COUNT=0" >> $env:GITHUB_OUTPUT
+          echo "MEDIUM_COUNT=0" >> $env:GITHUB_OUTPUT
+          echo "LOW_COUNT=0" >> $env:GITHUB_OUTPUT
+          echo "TOTAL_COUNT=0" >> $env:GITHUB_OUTPUT
+        }
+
     # Create comprehensive job summary
     - name: Create Job Summary
       shell: powershell
@@ -414,22 +504,42 @@ jobs:
       run: |
         Write-Host "Creating comprehensive job summary..."
         
+        # Get scan results
+        $scanStatus = "${{ steps.owasp-scan.outputs.SCAN_STATUS || 'unknown' }}"
+        $vulnerabilitiesFound = "${{ steps.owasp-scan.outputs.VULNERABILITIES_FOUND || 'unknown' }}"
+        $shouldFail = "${{ steps.owasp-scan.outputs.SHOULD_FAIL || 'false' }}"
+        
+        # Get vulnerability counts
+        $criticalCount = "${{ steps.vulnerability-analysis.outputs.CRITICAL_COUNT || '0' }}"
+        $highCount = "${{ steps.vulnerability-analysis.outputs.HIGH_COUNT || '0' }}"
+        $mediumCount = "${{ steps.vulnerability-analysis.outputs.MEDIUM_COUNT || '0' }}"
+        $lowCount = "${{ steps.vulnerability-analysis.outputs.LOW_COUNT || '0' }}"
+        $totalCount = "${{ steps.vulnerability-analysis.outputs.TOTAL_COUNT || '0' }}"
+        
         # Check if files exist
         $gitleaksExists = if ("${{ steps.gitleaks.outputs.sarif }}" -ne "") { Test-Path "${{ steps.gitleaks.outputs.sarif }}" } else { $false }
         $owaspExists = Test-Path "odc-reports"
         
-        # Determine GitLeaks status
-        $gitleaksStatus = if ($gitleaksExists) { "[SUCCESS] Completed" } else { "[WARNING] No results" }
-        $owaspStatus = if ($owaspExists) { "[SUCCESS] Completed" } else { "[ERROR] Failed" }
+        # Determine status indicators
+        $gitleaksStatus = if ($gitleaksExists) { "✅ Completed" } else { "⚠️ No results" }
+        $owaspStatus = switch ($scanStatus) {
+          "success" { "✅ Completed - No High/Critical Vulnerabilities" }
+          "success_with_vulnerabilities" { "⚠️ Completed - Vulnerabilities Found" }
+          "success_cached" { "✅ Completed with Cached Data" }
+          "success_cached_with_vulnerabilities" { "⚠️ Completed with Cached Data - Vulnerabilities Found" }
+          "failed" { "❌ Failed" }
+          default { "❓ Unknown Status" }
+        }
         
         # Get decode depth from inputs
         $decodeDepth = "${{ github.event.inputs.max_decode_depth || '2' }}"
         $verboseMode = "${{ github.event.inputs.enable_verbose || 'false' }}"
+        $failOnVulns = "${{ github.event.inputs.fail_on_vulnerabilities || 'false' }}"
         
         $summary = @"
-        ## Security Scan Results - Run #${{ github.run_number }}
+        ## 🔒 Security Scan Results - Run #${{ github.run_number }}
         
-        ### GitLeaks v8.26.0 Secret Scanning $gitleaksStatus
+        ### 🔍 GitLeaks v8.26.0 Secret Scanning $gitleaksStatus
         - **Status**: $gitleaksStatus
         - **Scope**: Full repository history
         - **Action**: gacts/gitleaks@v1 (Windows-compatible, no license required)
@@ -440,39 +550,51 @@ jobs:
           - .NET-specific rules and exclusions
           - Enhanced performance with modern allowlists
         
-        ### OWASP Dependency Check v12.1.1 $owaspStatus
+        ### 🛡️ OWASP Dependency Check v12.1.1 $owaspStatus
         - **Status**: $owaspStatus
         - **Version**: v12.1.1 (Latest)
         - **Project**: Todo MVC Security Scan
         - **Fail Threshold**: CVSS Score >= 7.0 (High/Critical)
         - **NVD API**: Public Access (Rate Limited - Testing without API key)
-        - **Reports Generated**: 
-          - HTML Report (human-readable)
-          - JSON Report (machine-readable)
-          - XML Report (integration)
-          - SARIF Report (uploaded to Security tab)
         
-        ### View Results
-        - **Security Tab**: Navigate to Security -> Code scanning alerts
+        ### 📊 Vulnerability Summary
+        - **Critical**: $criticalCount vulnerabilities
+        - **High**: $highCount vulnerabilities  
+        - **Medium**: $mediumCount vulnerabilities
+        - **Low**: $lowCount vulnerabilities
+        - **Total**: $totalCount vulnerabilities found
+        
+        ### 📋 Reports Generated
+        - HTML Report (human-readable)
+        - JSON Report (machine-readable)
+        - XML Report (integration)
+        - SARIF Report (uploaded to Security tab)
+        - GitLab JSON Report (CI/CD integration)
+        - JUnit XML Report (test integration)
+        - CSV Report (spreadsheet analysis)
+        
+        ### 🎯 View Results
+        - **Security Tab**: Navigate to Security → Code scanning alerts
         - **Artifacts**: Download scan results from this workflow run
         - **GitLeaks Logs**: Review secret detection details in workflow logs
         - **OWASP Reports**: Download detailed vulnerability reports
         
-        ### Workflow Controls
+        ### ⚙️ Workflow Configuration
         - **Manual Trigger**: Use 'Run workflow' button for custom scans
         - **Configuration**: Custom .gitleaks.toml with .NET optimizations
         - **Scheduling**: Automatic weekly scans on Sundays
+        - **Fail on Vulnerabilities**: $failOnVulns
         
-        ### Next Steps
+        ### 🚨 Next Steps
         If vulnerabilities or secrets are found:
-        1. Review the detailed reports in Security tab
-        2. Download artifacts for offline analysis
-        3. Update vulnerable dependencies immediately
-        4. Rotate any exposed secrets
-        5. Apply security patches
-        6. Re-run the security scan to verify fixes
+        1. 📋 Review the detailed reports in Security tab
+        2. 📥 Download artifacts for offline analysis
+        3. 🔄 Update vulnerable dependencies immediately
+        4. 🔐 Rotate any exposed secrets
+        5. 🛡️ Apply security patches
+        6. ♻️ Re-run the security scan to verify fixes
         
-        ### Configuration
+        ### 🔧 Technical Configuration
         - **GitLeaks Config**: .gitleaks.toml (v8.26.0 syntax)
         - **OWASP Exclusions**: Build artifacts, packages, IDE files
         - **Caching**: Enabled for faster subsequent runs
@@ -482,12 +604,21 @@ jobs:
         echo $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
         Write-Host "[SUCCESS] Job summary created successfully"
 
-  # Enhanced vulnerability notification with more details
+    # Fail the job if vulnerabilities found and configured to fail
+    - name: Check if Workflow Should Fail
+      if: always() && steps.owasp-scan.outputs.SHOULD_FAIL == 'true'
+      shell: powershell
+      run: |
+        Write-Host "[ERROR] Security scan completed but found high-severity vulnerabilities or critical errors"
+        Write-Host "[ERROR] Failing workflow as requested (fail_on_vulnerabilities=true or scan failed)"
+        exit 1
+
+  # Enhanced vulnerability notification with vulnerability details
   notify-on-vulnerabilities:
     name: Security Alert Notification
     runs-on: windows-latest
     needs: security-scan
-    if: failure()
+    if: always() && (failure() || needs.security-scan.outputs.VULNERABILITIES_FOUND == 'true')
     
     permissions:
       issues: write
@@ -504,13 +635,27 @@ jobs:
           const branch = context.ref.replace('refs/heads/', '');
           const actor = context.actor;
           
+          // Get vulnerability counts from the previous job
+          const criticalCount = "${{ needs.security-scan.outputs.CRITICAL_COUNT || '0' }}";
+          const highCount = "${{ needs.security-scan.outputs.HIGH_COUNT || '0' }}";
+          const mediumCount = "${{ needs.security-scan.outputs.MEDIUM_COUNT || '0' }}";
+          const lowCount = "${{ needs.security-scan.outputs.LOW_COUNT || '0' }}";
+          const totalCount = "${{ needs.security-scan.outputs.TOTAL_COUNT || '0' }}";
+          
           const title = `🚨 Security Vulnerabilities Detected - Run #${runNumber}`;
           const body = `
           ## 🔴 Security Alert - Immediate Action Required
           
           High severity vulnerabilities (CVSS ≥ 7.0) or exposed secrets have been detected in the repository.
           
-          ### 📊 Scan Details
+          ### 📊 Vulnerability Summary
+          - **Critical**: ${criticalCount} vulnerabilities
+          - **High**: ${highCount} vulnerabilities
+          - **Medium**: ${mediumCount} vulnerabilities
+          - **Low**: ${lowCount} vulnerabilities
+          - **Total**: ${totalCount} vulnerabilities found
+          
+          ### 📋 Scan Details
           - **Run ID**: [${runId}](${context.payload.repository.html_url}/actions/runs/${runId})
           - **Branch**: \`${branch}\`
           - **Commit**: \`${sha}\`
@@ -543,11 +688,21 @@ jobs:
           3. 🎯 **Review Process**: Assess how vulnerabilities were introduced
           4. 🔒 **Strengthen Pipeline**: Consider additional security measures
           
+          ### 🔧 Known Issues & Fixes
+          
+          **CVE-2025-48734 (commons-beanutils-1.9.4.jar)**
+          - **Severity**: High (CVSS 8.8)
+          - **Component**: Apache Commons BeanUtils 1.9.4
+          - **Fix**: Upgrade to commons-beanutils 1.11.0 or later
+          - **Root Cause**: Transitive dependency via Microsoft.VisualStudio.Web.CodeGeneration packages
+          - **Action**: Update or remove Microsoft.VisualStudio.Web.CodeGeneration.Design package
+          
           ### 📚 Resources
           - [GitLeaks Documentation](https://github.com/gitleaks/gitleaks)
           - [OWASP Dependency Check](https://owasp.org/www-project-dependency-check/)
           - [Vulnerability Database](https://nvd.nist.gov/)
           - [.NET Security Guidelines](https://docs.microsoft.com/en-us/dotnet/standard/security/)
+          - [CVE-2025-48734 Details](https://nvd.nist.gov/vuln/detail/CVE-2025-48734)
           
           ### 🔧 Workflow Configuration
           - **Config Files**: \`.gitleaks.toml\`, workflow in \`.github/workflows/security-scan.yml\`
@@ -579,6 +734,12 @@ jobs:
             issue_number: issue.data.number,
             body: `## ✅ Security Response Checklist
             
+            ### Critical Vulnerabilities
+            - [ ] CVE-2025-48734: Update commons-beanutils to 1.11.0+
+            - [ ] Review Microsoft.VisualStudio.Web.CodeGeneration.Design usage
+            - [ ] Check for other transitive dependency vulnerabilities
+            
+            ### General Response
             - [ ] Reviewed Security tab alerts
             - [ ] Downloaded and analyzed reports
             - [ ] Rotated any exposed secrets
