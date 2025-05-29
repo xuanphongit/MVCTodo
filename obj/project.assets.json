@@ -5572,11 +5572,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\PracticeDevOps\\MVC\\Todo\\Todo.csproj",
+      "projectUniqueName": "D:\\PracticeDevOps\\MVC\\Todo.csproj",
       "projectName": "Todo",
-      "projectPath": "D:\\PracticeDevOps\\MVC\\Todo\\Todo.csproj",
+      "projectPath": "D:\\PracticeDevOps\\MVC\\Todo.csproj",
       "packagesPath": "C:\\Users\\thien\\.nuget\\packages\\",
-      "outputPath": "D:\\PracticeDevOps\\MVC\\Todo\\obj\\",
+      "outputPath": "D:\\PracticeDevOps\\MVC\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -2,8 +2,10 @@
 {
     // Controllers/HomeController.cs
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.Authorization;
     using Todo.Model;
 
+    [Authorize]
     public class HomeController : Controller
     {
         private static List<TodoItem> _todos = new List<TodoItem>();

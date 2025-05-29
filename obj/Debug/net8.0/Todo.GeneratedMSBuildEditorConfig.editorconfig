@@ -17,57 +17,61 @@ build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = Todo
 build_property.RootNamespace = Todo
-build_property.ProjectDir = D:\PracticeDevOps\MVC\Todo\
+build_property.ProjectDir = D:\PracticeDevOps\MVC\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 8.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = D:\PracticeDevOps\MVC\Todo
+build_property.MSBuildProjectDirectory = D:\PracticeDevOps\MVC
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 8.0
 build_property.EnableCodeStyleSeverity = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/Error.cshtml]
+[D:/PracticeDevOps/MVC/Pages/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/Index.cshtml]
+[D:/PracticeDevOps/MVC/Pages/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXguY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/Privacy.cshtml]
+[D:/PracticeDevOps/MVC/Pages/Privacy.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJpdmFjeS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/Shared/_ValidationScriptsPartial.cshtml]
+[D:/PracticeDevOps/MVC/Pages/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/_ViewImports.cshtml]
+[D:/PracticeDevOps/MVC/Pages/_ViewImports.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX1ZpZXdJbXBvcnRzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/_ViewStart.cshtml]
+[D:/PracticeDevOps/MVC/Pages/_ViewStart.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX1ZpZXdTdGFydC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Views/Home/Create.cshtml]
+[D:/PracticeDevOps/MVC/Views/Account/Login.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3NcQWNjb3VudFxMb2dpbi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/PracticeDevOps/MVC/Views/Home/Create.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxDcmVhdGUuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Views/Home/Delete.cshtml]
+[D:/PracticeDevOps/MVC/Views/Home/Delete.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxEZWxldGUuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Views/Home/Index.cshtml]
+[D:/PracticeDevOps/MVC/Views/Home/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSG9tZVxJbmRleC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Views/Shared/_ValidationScriptsPartial.cshtml]
+[D:/PracticeDevOps/MVC/Views/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/PracticeDevOps/MVC/Todo/Pages/Shared/_Layout.cshtml]
+[D:/PracticeDevOps/MVC/Pages/Shared/_Layout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9MYXlvdXQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = b-eqepryahhv

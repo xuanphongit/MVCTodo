@@ -1,37 +1,37 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\PracticeDevOps\\MVC\\Todo\\",
+  "WorkspaceRootPath": "D:\\PracticeDevOps\\MVC\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\views\\home\\delete.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\views\\home\\delete.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:views\\home\\delete.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\controllers\\homecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\controllers\\homecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:controllers\\homecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\views\\home\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\views\\home\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:views\\home\\create.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\pages\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\pages\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:pages\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:views\\home\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\model\\todoitem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\model\\todoitem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:model\\todoitem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\pages\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\pages\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:pages\\index.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\todo\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|d:\\practicedevops\\mvc\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{111C8847-6022-40A3-BDB6-285AC8B52779}|Todo.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -48,11 +48,11 @@
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Delete.cshtml",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Views\\Home\\Delete.cshtml",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Views\\Home\\Delete.cshtml",
               "RelativeDocumentMoniker": "Views\\Home\\Delete.cshtml",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Views\\Home\\Delete.cshtml",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Views\\Home\\Delete.cshtml",
               "RelativeToolTip": "Views\\Home\\Delete.cshtml",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAANAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAA8AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
               "WhenOpened": "2025-03-19T13:01:22.51Z",
               "EditorCaption": ""
@@ -61,92 +61,85 @@
               "$type": "Document",
               "DocumentIndex": 2,
               "Title": "Create.cshtml",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Views\\Home\\Create.cshtml",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Views\\Home\\Create.cshtml",
               "RelativeDocumentMoniker": "Views\\Home\\Create.cshtml",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Views\\Home\\Create.cshtml",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Views\\Home\\Create.cshtml",
               "RelativeToolTip": "Views\\Home\\Create.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-03-19T13:00:42.077Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T13:00:42.077Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 4,
               "Title": "Index.cshtml",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Views\\Home\\Index.cshtml",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Views\\Home\\Index.cshtml",
               "RelativeDocumentMoniker": "Views\\Home\\Index.cshtml",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Views\\Home\\Index.cshtml",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Views\\Home\\Index.cshtml",
               "RelativeToolTip": "Views\\Home\\Index.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABsAAAAYAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-03-19T12:59:40.358Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T12:59:40.358Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
               "Title": "HomeController.cs",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Controllers\\HomeController.cs",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Controllers\\HomeController.cs",
               "RelativeDocumentMoniker": "Controllers\\HomeController.cs",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Controllers\\HomeController.cs",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Controllers\\HomeController.cs",
               "RelativeToolTip": "Controllers\\HomeController.cs",
               "ViewState": "AgIAABAAAAAAAAAAAAAQwCEAAAAhAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-03-19T12:57:51.108Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T12:57:51.108Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 5,
               "Title": "TodoItem.cs",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Model\\TodoItem.cs",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Model\\TodoItem.cs",
               "RelativeDocumentMoniker": "Model\\TodoItem.cs",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Model\\TodoItem.cs",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Model\\TodoItem.cs",
               "RelativeToolTip": "Model\\TodoItem.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-03-19T12:57:17.366Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T12:57:17.366Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 6,
               "Title": "Index.cshtml.cs",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Pages\\Index.cshtml.cs",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Pages\\Index.cshtml.cs",
               "RelativeDocumentMoniker": "Pages\\Index.cshtml.cs",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Pages\\Index.cshtml.cs",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Pages\\Index.cshtml.cs",
               "RelativeToolTip": "Pages\\Index.cshtml.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAuwBIAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-03-19T12:55:33.138Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T12:55:33.138Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 3,
               "Title": "Index.cshtml",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Pages\\Index.cshtml",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Pages\\Index.cshtml",
               "RelativeDocumentMoniker": "Pages\\Index.cshtml",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Pages\\Index.cshtml",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Pages\\Index.cshtml",
               "RelativeToolTip": "Pages\\Index.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-03-19T12:55:03.93Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T12:55:03.93Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 7,
               "Title": "Program.cs",
-              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Todo\\Program.cs",
+              "DocumentMoniker": "D:\\PracticeDevOps\\MVC\\Program.cs",
               "RelativeDocumentMoniker": "Program.cs",
-              "ToolTip": "D:\\PracticeDevOps\\MVC\\Todo\\Program.cs",
+              "ToolTip": "D:\\PracticeDevOps\\MVC\\Program.cs",
               "RelativeToolTip": "Program.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-03-19T12:54:11.515Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-03-19T12:54:11.515Z"
             }
           ]
         }

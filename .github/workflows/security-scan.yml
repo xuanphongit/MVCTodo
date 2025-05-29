@@ -1,0 +1,211 @@
+name: Security Scan - OWASP & GitLeaks
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  security-scan:
+    name: Security Analysis
+    runs-on: windows-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # GitLeaks Secret Scanning
+    - name: Run GitLeaks Secret Scan
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+    # Setup .NET for project analysis
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    # Cache NuGet packages
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    # Restore .NET dependencies
+    - name: Restore dependencies
+      run: dotnet restore Todo.csproj
+
+    # Cache OWASP Dependency Check database
+    - name: Cache OWASP Dependency Check Database
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/odc-data
+        key: ${{ runner.os }}-owasp-db-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-owasp-db-
+
+    # Setup Java for OWASP Dependency Check
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+
+    # Download and setup OWASP Dependency Check
+    - name: Setup OWASP Dependency Check
+      shell: powershell
+      run: |
+        $odcVersion = "12.1"
+        $downloadUrl = "https://github.com/jeremylong/DependencyCheck/releases/download/v$odcVersion/dependency-check-$odcVersion-release.zip"
+        $zipPath = "dependency-check.zip"
+        $extractPath = "dependency-check"
+        
+        Write-Host "Downloading OWASP Dependency Check v$odcVersion..."
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath
+        
+        Write-Host "Extracting OWASP Dependency Check..."
+        Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+        
+        # Add to PATH
+        $odcPath = Join-Path $PWD "dependency-check\dependency-check\bin"
+        echo $odcPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    # Run OWASP Dependency Check
+    - name: Run OWASP Dependency Check
+      shell: powershell
+      run: |
+        $dataDir = Join-Path $env:USERPROFILE "odc-data"
+        $reportDir = "odc-reports"
+        
+        # Create directories if they don't exist
+        if (!(Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir -Force }
+        if (!(Test-Path $reportDir)) { New-Item -ItemType Directory -Path $reportDir -Force }
+        
+        Write-Host "Running OWASP Dependency Check..."
+        
+        & dependency-check.bat `
+          --project "Todo MVC Security Scan" `
+          --scan "." `
+          --format "ALL" `
+          --out $reportDir `
+          --data $dataDir `
+          --enableRetired `
+          --enableExperimental `
+          --failOnCVSS 7 `
+          --exclude "**\bin\**" `
+          --exclude "**\obj\**" `
+          --exclude "**\.git\**" `
+          --exclude "**\.vs\**" `
+          --exclude "**\node_modules\**"
+
+    # Upload OWASP reports as artifacts
+    - name: Upload OWASP Dependency Check Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: owasp-dependency-check-results
+        path: odc-reports/
+        retention-days: 30
+
+    # Upload SARIF results to GitHub Security tab
+    - name: Upload SARIF to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: odc-reports/dependency-check-report.sarif
+
+    # Create job summary
+    - name: Create Job Summary
+      shell: powershell
+      if: always()
+      run: |
+        Write-Host "Creating job summary..."
+        
+        $summary = @"
+        ## Security Scan Results 🔍
+        
+        ### GitLeaks Secret Scanning ✅
+        - **Status**: Completed
+        - **Scope**: Full repository history
+        
+        ### OWASP Dependency Check 🛡️
+        - **Status**: Completed
+        - **Project**: Todo MVC Security Scan
+        - **Fail Threshold**: CVSS Score ≥ 7.0
+        - **Reports Generated**: 
+          - HTML Report
+          - JSON Report  
+          - XML Report
+          - SARIF Report (uploaded to Security tab)
+        
+        ### 📊 View Results
+        - Check the **Security** tab for detailed vulnerability information
+        - Download the **owasp-dependency-check-results** artifact for complete reports
+        - Review any GitLeaks findings in the workflow logs
+        
+        ### 🔧 Next Steps
+        If vulnerabilities are found:
+        1. Review the detailed reports
+        2. Update vulnerable dependencies
+        3. Apply security patches
+        4. Re-run the security scan
+        "@
+        
+        echo $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # Separate job for dependency vulnerability notification
+  notify-on-vulnerabilities:
+    name: Vulnerability Notification
+    runs-on: windows-latest
+    needs: security-scan
+    if: failure()
+    
+    steps:
+    - name: Create Issue on High Severity Vulnerabilities
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = `🚨 High Severity Vulnerabilities Detected - ${new Date().toISOString().split('T')[0]}`;
+          const body = `
+          ## Security Alert 🔴
+          
+          High severity vulnerabilities (CVSS ≥ 7.0) have been detected in the project dependencies.
+          
+          ### Action Required:
+          1. Review the [security scan results](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          2. Download the OWASP Dependency Check reports
+          3. Update vulnerable dependencies immediately
+          4. Apply security patches
+          
+          ### Workflow Details:
+          - **Run ID**: ${context.runId}
+          - **Branch**: ${context.ref}
+          - **Commit**: ${context.sha}
+          
+          **This issue was automatically created by the Security Scan workflow.**
+          `;
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['security', 'vulnerability', 'high-priority']
+          }); 

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "EmUv+X4uquc=",
+  "dgSpecHash": "0mV06zMzc1k=",
   "success": true,
-  "projectFilePath": "D:\\PracticeDevOps\\MVC\\Todo\\Todo.csproj",
+  "projectFilePath": "D:\\PracticeDevOps\\MVC\\Todo.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\thien\\.nuget\\packages\\humanizer\\2.14.1\\humanizer.2.14.1.nupkg.sha512",
     "C:\\Users\\thien\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
