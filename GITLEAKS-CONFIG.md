@@ -190,7 +190,7 @@ public class TestSecrets
     // Example GUID: 12345678-1234-1234-1234-123456789abc
     
     // This should be detected (real API key pattern)
-    private string apiKey = "sk_live_abcdef1234567890abcdef12";
+    private string apiKey = "sk_live_YOUR_STRIPE_KEY_HERE_32_CHARS";
     
     // This should be ignored (demo API key with stopword)
     private string demoApiKey = "demo-api-key-fake123";

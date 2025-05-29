@@ -6,8 +6,22 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- 
+  Security Note: Microsoft.VisualStudio.Web.CodeGeneration.Design was removed due to CVE-2025-48734
+  This package pulls in commons-beanutils-1.9.4.jar which has a critical vulnerability (CVSS 8.8).
+  
+  If scaffolding is needed for development, install temporarily with:
+  dotnet add package Microsoft.VisualStudio.Web.CodeGeneration.Design version 9.0.0
+  
+  Alternatively, use modern alternatives:
+  * .NET CLI templates: dotnet new
+  * Visual Studio built-in scaffolding
+  * Manual code generation
+  -->
+  
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
+    <!-- Core runtime dependencies only, no development/scaffolding packages -->
+    <!-- Add production packages here as needed -->
   </ItemGroup>
 
 </Project>
