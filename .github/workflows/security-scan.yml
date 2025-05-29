@@ -136,8 +136,6 @@ jobs:
     # Run OWASP Dependency Check
     - name: Run OWASP Dependency Check
       shell: powershell
-      env:
-        NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
         $dataDir = Join-Path $env:USERPROFILE "odc-data"
         $reportDir = "odc-reports"
@@ -177,12 +175,9 @@ jobs:
         # Show cache status
         Write-Host "[INFO] Cache Status: ${{ steps.nvd-cache.outputs.cache-hit == 'true' && 'HIT - Using cached NVD data' || 'MISS - Will download NVD data' }}"
         
-        # Check if NVD API key is available
-        if ($env:NVD_API_KEY) {
-          Write-Host "[SUCCESS] NVD API Key detected - faster updates enabled"
-        } else {
-          Write-Host "[WARNING] No NVD API Key found - updates will be slower"
-        }
+        # Note about NVD API access
+        Write-Host "[INFO] Using public NVD API access (no API key configured)"
+        Write-Host "[INFO] Updates will be slower due to rate limiting, but fully functional"
         
         # Build the base command arguments (only supported options)
         $dependencyCheckArgs = @(
@@ -203,11 +198,6 @@ jobs:
           "--exclude", "**\.nuget\**",
           "--exclude", "**\TestResults\**"
         )
-        
-        # Add NVD API key if available (only supported option)
-        if ($env:NVD_API_KEY) {
-          $dependencyCheckArgs += "--nvdApiKey", $env:NVD_API_KEY
-        }
         
         # First attempt: Try with NVD updates
         Write-Host "[INFO] Attempting scan with NVD database updates..."
@@ -455,7 +445,7 @@ jobs:
         - **Version**: v12.1.1 (Latest)
         - **Project**: Todo MVC Security Scan
         - **Fail Threshold**: CVSS Score >= 7.0 (High/Critical)
-        - **NVD API**: ${{ secrets.NVD_API_KEY && 'Enabled (Fast Updates)' || 'Not configured (Slow Updates)' }}
+        - **NVD API**: Public Access (Rate Limited - Testing without API key)
         - **Reports Generated**: 
           - HTML Report (human-readable)
           - JSON Report (machine-readable)
