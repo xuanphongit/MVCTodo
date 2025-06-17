@@ -1026,13 +1026,14 @@ jobs:
               $filePath = "$deployPath\$file"
               if (Test-Path $filePath) {
                 $fileInfo = Get-Item $filePath
-                Write-Host "  ✓ $file ($([math]::Round($fileInfo.Length/1KB,1))KB, $($fileInfo.LastWriteTime))" -ForegroundColor Green
+                $fileSizeKB = [math]::Round($fileInfo.Length/1KB,1)
+                Write-Host "  [OK] $file (${fileSizeKB}KB, $($fileInfo.LastWriteTime))" -ForegroundColor Green
               } else {
-                Write-Host "  ✗ $file (missing)" -ForegroundColor Red
+                Write-Host "  [MISSING] $file" -ForegroundColor Red
               }
             }
           } else {
-            Write-Host "  ✗ Deployment directory does not exist: $deployPath" -ForegroundColor Red
+            Write-Host "  [ERROR] Deployment directory does not exist: $deployPath" -ForegroundColor Red
           }
           
           # Check recent event logs
@@ -1133,25 +1134,25 @@ jobs:
         
         Write-Host ""
         if ($success) {
-          Write-Host "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY! 🎉" -ForegroundColor Green
+          Write-Host "[SUCCESS] DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
           Write-Host ""
           Write-Host "=== NEXT STEPS ===" -ForegroundColor Yellow
-          Write-Host "✓ Verify application functionality" -ForegroundColor White
-          Write-Host "✓ Monitor application logs" -ForegroundColor White
-          Write-Host "✓ Check performance metrics" -ForegroundColor White
-          Write-Host "✓ Update monitoring dashboards" -ForegroundColor White
+          Write-Host "- Verify application functionality" -ForegroundColor White
+          Write-Host "- Monitor application logs" -ForegroundColor White
+          Write-Host "- Check performance metrics" -ForegroundColor White
+          Write-Host "- Update monitoring dashboards" -ForegroundColor White
           
           if ($environment -eq "production") {
             Write-Host ""
             Write-Host "=== PRODUCTION CHECKLIST ===" -ForegroundColor Magenta
-            Write-Host "□ SSL certificate configured" -ForegroundColor White
-            Write-Host "□ Security headers enabled" -ForegroundColor White
-            Write-Host "□ Monitoring alerts active" -ForegroundColor White
-            Write-Host "□ Backup verification" -ForegroundColor White
-            Write-Host "□ Performance baseline established" -ForegroundColor White
+            Write-Host "[ ] SSL certificate configured" -ForegroundColor White
+            Write-Host "[ ] Security headers enabled" -ForegroundColor White
+            Write-Host "[ ] Monitoring alerts active" -ForegroundColor White
+            Write-Host "[ ] Backup verification" -ForegroundColor White
+            Write-Host "[ ] Performance baseline established" -ForegroundColor White
           }
         } else {
-          Write-Host "❌ DEPLOYMENT FAILED! ❌" -ForegroundColor Red
+          Write-Host "[FAILED] DEPLOYMENT FAILED!" -ForegroundColor Red
           Write-Host ""
           Write-Host "=== TROUBLESHOOTING RESOURCES ===" -ForegroundColor Yellow
           Write-Host "• Check GitHub Actions logs above" -ForegroundColor White
