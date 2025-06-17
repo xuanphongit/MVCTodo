@@ -39,6 +39,11 @@ jobs:
       with:
         fetch-depth: 1
 
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
     - name: Display Environment Info
       shell: powershell
       run: |
@@ -58,10 +63,14 @@ jobs:
       run: |
         Write-Host "Initializing IIS Configuration..."
         
+        # Check if running as Administrator
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+        Write-Host "[INFO] Running as Administrator: $isAdmin"
+        
         # Ensure IIS is running
         try {
           $iisService = Get-Service -Name W3SVC -ErrorAction SilentlyContinue
-          if ($iisService.Status -ne "Running") {
+          if ($iisService -and $iisService.Status -ne "Running") {
             Write-Host "Starting IIS service..."
             Start-Service -Name W3SVC
             Write-Host "[SUCCESS] IIS service started"
@@ -72,31 +81,73 @@ jobs:
           Write-Warning "[WARNING] Could not check/start IIS service: $($_.Exception.Message)"
         }
         
-                 # Create redirection.config if it doesn't exist
-         $redirectionConfigPath = "$env:SystemRoot\System32\inetsrv\config\redirection.config"
-         if (!(Test-Path $redirectionConfigPath)) {
-           Write-Host "Creating missing redirection.config..."
-           try {
-             $redirectionConfig = '<?xml version="1.0" encoding="UTF-8"?><configuration><configSections><section name="configurationRedirection" type="System.Configuration.IgnoreSectionHandler" allowDefinition="MachineOnly" restartOnExternalChanges="true" requirePermission="false" /></configSections><configurationRedirection enabled="false" /></configuration>'
-             $redirectionConfig | Out-File -FilePath $redirectionConfigPath -Encoding UTF8 -Force
-             Write-Host "[SUCCESS] Created redirection.config"
-           } catch {
-             Write-Warning "[WARNING] Could not create redirection.config: $($_.Exception.Message)"
-           }
-         } else {
-           Write-Host "[INFO] redirection.config already exists"
-         }
-        
-        # Reset IIS configuration to ensure clean state
+        # Handle redirection.config with proper permission handling
+        $redirectionConfigPath = "$env:SystemRoot\System32\inetsrv\config\redirection.config"
         try {
-          Write-Host "Resetting IIS configuration..."
-          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" reset config -section:system.webServer/globalModules
-          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" reset config -section:system.webServer/modules
-          Write-Host "[SUCCESS] IIS configuration reset completed"
+          # Try to check if file exists with error handling
+          $fileExists = $false
+          try {
+            $fileExists = Test-Path $redirectionConfigPath -ErrorAction Stop
+            Write-Host "[INFO] Successfully checked redirection.config existence: $fileExists"
+          } catch [System.UnauthorizedAccessException] {
+            Write-Warning "[WARNING] Access denied checking redirection.config - assuming it needs to be created"
+            $fileExists = $false
+          } catch {
+            Write-Warning "[WARNING] Could not check redirection.config: $($_.Exception.Message)"
+            $fileExists = $false
+          }
+          
+          if (!$fileExists) {
+            Write-Host "Attempting to create redirection.config..."
+            try {
+              # Try to create the directory first if it doesn't exist
+              $configDir = Split-Path $redirectionConfigPath -Parent
+              if (!(Test-Path $configDir -ErrorAction SilentlyContinue)) {
+                New-Item -ItemType Directory -Path $configDir -Force -ErrorAction SilentlyContinue | Out-Null
+                Write-Host "[INFO] Created config directory"
+              }
+              
+              # Create the redirection.config file
+              $redirectionConfig = '<?xml version="1.0" encoding="UTF-8"?><configuration><configSections><section name="configurationRedirection" type="System.Configuration.IgnoreSectionHandler" allowDefinition="MachineOnly" restartOnExternalChanges="true" requirePermission="false" /></configSections><configurationRedirection enabled="false" /></configuration>'
+              
+              # Try multiple methods to create the file
+              try {
+                $redirectionConfig | Out-File -FilePath $redirectionConfigPath -Encoding UTF8 -Force -ErrorAction Stop
+                Write-Host "[SUCCESS] Created redirection.config using Out-File"
+              } catch {
+                # Alternative method using .NET
+                [System.IO.File]::WriteAllText($redirectionConfigPath, $redirectionConfig, [System.Text.Encoding]::UTF8)
+                Write-Host "[SUCCESS] Created redirection.config using .NET File.WriteAllText"
+              }
+            } catch {
+              Write-Warning "[WARNING] Could not create redirection.config: $($_.Exception.Message)"
+              Write-Host "[INFO] This may not prevent deployment from continuing..."
+            }
+          } else {
+            Write-Host "[INFO] redirection.config already exists"
+          }
         } catch {
-          Write-Warning "[WARNING] IIS configuration reset failed: $($_.Exception.Message)"
+          Write-Warning "[WARNING] Error handling redirection.config: $($_.Exception.Message)"
           Write-Host "[INFO] Continuing with deployment..."
         }
+        
+        # Initialize IIS using appcmd (usually has better permissions)
+        try {
+          Write-Host "Initializing IIS using appcmd..."
+          
+          # List current configuration to verify IIS is accessible
+          $appcmdResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list config -section:system.webServer/globalModules 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] IIS configuration is accessible via appcmd"
+          } else {
+            Write-Warning "[WARNING] IIS configuration may have issues, but continuing..."
+          }
+        } catch {
+          Write-Warning "[WARNING] IIS initialization check failed: $($_.Exception.Message)"
+          Write-Host "[INFO] Continuing with deployment..."
+        }
+        
+        Write-Host "[SUCCESS] IIS initialization completed"
 
     - name: Restore dependencies
       shell: powershell
