@@ -4,43 +4,104 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Todo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/todo-components.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/auth-components.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/Todo.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">Todo</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
-                        </li>
-                    </ul>
+<body class="app-layout">
+    <div class="app-wrapper">
+        <header class="app-header">
+            <nav class="enhanced-navbar">
+                <div class="nav-container">
+                    <div class="nav-brand">
+                        <a class="brand-link" asp-area="" asp-page="/Index">
+                            <span class="brand-icon">📝</span>
+                            <span class="brand-text">Todo</span>
+                        </a>
+                    </div>
+                    <button class="nav-toggle" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                            aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="toggle-line"></span>
+                        <span class="toggle-line"></span>
+                        <span class="toggle-line"></span>
+                    </button>
+                    <div class="navbar-collapse collapse">
+                        <ul class="nav-menu">
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Index">
+                                    <span class="nav-icon">🏠</span>
+                                    <span class="nav-text">Home</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Privacy">
+                                    <span class="nav-icon">🔒</span>
+                                    <span class="nav-text">Privacy</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/Account/Login">
+                                    <span class="nav-icon">👤</span>
+                                    <span class="nav-text">Account</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+            </nav>
+        </header>
+        
+        <main class="app-main" role="main">
             @RenderBody()
         </main>
+        
+        <footer class="app-footer">
+            <div class="footer-container">
+                <div class="footer-content">
+                    <div class="footer-brand">
+                        <span class="footer-icon">📝</span>
+                        <span class="footer-title">Todo App</span>
+                    </div>
+                    <div class="footer-links">
+                        <a asp-page="/About" class="footer-link">
+                            <span class="footer-link-icon">ℹ️</span>
+                            <span class="footer-link-text">About</span>
+                        </a>
+                        <a asp-area="" asp-page="/Privacy" class="footer-link">
+                            <span class="footer-link-icon">🔐</span>
+                            <span class="footer-link-text">Privacy</span>
+                        </a>
+                        <a href="#" class="footer-link">
+                            <span class="footer-link-icon">🎧</span>
+                            <span class="footer-link-text">Support</span>
+                        </a>
+                    </div>
+                    <div class="footer-social">
+                        <a href="#" class="social-link" title="GitHub">
+                            <span class="social-icon">🐙</span>
+                        </a>
+                        <a href="#" class="social-link" title="Twitter">
+                            <span class="social-icon">🐦</span>
+                        </a>
+                        <a href="#" class="social-link" title="LinkedIn">
+                            <span class="social-icon">💼</span>
+                        </a>
+                        <a href="#" class="social-link" title="Discord">
+                            <span class="social-icon">💬</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>&copy; 2025 Todo App. Made with ❤️ for productivity</p>
+                </div>
+            </div>
+        </footer>
     </div>
-
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - Todo - <a asp-area="" asp-page="/Privacy">Privacy</a>
-        </div>
-    </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

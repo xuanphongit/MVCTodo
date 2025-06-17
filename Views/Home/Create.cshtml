@@ -1,35 +1,49 @@
 ﻿@model Todo.Model.TodoItem
 
-<h4>TodoItem</h4>
-<hr />
-<div class="row">
-    <div class="col-md-4">
-        <form asp-action="Create">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
-                <label asp-for="Id" class="control-label"></label>
-                <input asp-for="Id" class="form-control" />
-                <span asp-validation-for="Id" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="Title" class="control-label"></label>
-                <input asp-for="Title" class="form-control" />
-                <span asp-validation-for="Title" class="text-danger"></span>
-            </div>
-            <div class="form-group form-check">
-                <label class="form-check-label">
-                    <input class="form-check-input" asp-for="IsCompleted" /> @Html.DisplayNameFor(model => model.IsCompleted)
-                </label>
-            </div>
-            <div class="form-group">
-                <input type="submit" value="Create" class="btn btn-primary" />
-            </div>
-        </form>
-    </div>
-</div>
+@{
+    ViewData["Title"] = "Create New Task";
+}
 
-<div>
-    <a asp-action="Index">Back to List</a>
+<div class="todo-container">
+    <div class="todo-form-card">
+        <div class="todo-form-header">
+            <h1>Create New Task</h1>
+            <h4>Add a new item to your todo list</h4>
+        </div>
+
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="todo-validation-error"></div>
+            
+            <div class="todo-form-group">
+                <label asp-for="Id" class="todo-label">Task ID</label>
+                <input asp-for="Id" class="todo-input" placeholder="Enter unique task ID..." />
+                <span asp-validation-for="Id" class="todo-validation-error"></span>
+            </div>
+            
+            <div class="todo-form-group">
+                <label asp-for="Title" class="todo-label">Task Title</label>
+                <input asp-for="Title" class="todo-input" placeholder="Describe your task..." />
+                <span asp-validation-for="Title" class="todo-validation-error"></span>
+            </div>
+            
+            <div class="todo-form-group">
+                <div class="todo-checkbox-group">
+                    <input class="todo-checkbox" asp-for="IsCompleted" type="checkbox" />
+                    <label class="todo-checkbox-label" asp-for="IsCompleted">
+                        @Html.DisplayNameFor(model => model.IsCompleted)
+                    </label>
+                </div>
+            </div>
+            
+            <button type="submit" class="todo-submit-btn">
+                🚀 Create Task
+            </button>
+        </form>
+
+        <div class="todo-actions">
+            <a asp-action="Index" class="todo-link">Back to List</a>
+        </div>
+    </div>
 </div>
 
 @section Scripts {

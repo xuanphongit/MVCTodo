@@ -1,29 +1,80 @@
 @model Todo.Model.User
 
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="text-center">Đăng nhập</h3>
-                </div>
-                <div class="card-body">
-                    <form asp-action="Login" method="post">
-                        <div class="form-group">
-                            <label asp-for="Username">Tên đăng nhập</label>
-                            <input asp-for="Username" class="form-control" />
-                        </div>
-                        <div class="form-group mt-3">
-                            <label asp-for="Password">Mật khẩu</label>
-                            <input asp-for="Password" type="password" class="form-control" />
-                        </div>
-                        <div class="text-danger" asp-validation-summary="All"></div>
-                        <div class="form-group mt-3">
-                            <button type="submit" class="btn btn-primary w-100">Đăng nhập</button>
-                        </div>
-                    </form>
-                </div>
+@{
+    ViewData["Title"] = "Đăng nhập";
+    Layout = "~/Pages/Shared/_Layout.cshtml";
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>🔐 Đăng nhập</h1>
+            <h4>Chào mừng bạn quay trở lại</h4>
+        </div>
+
+        <form asp-action="Login" method="post" class="auth-form">
+            <div asp-validation-summary="All" class="auth-validation-error"></div>
+            
+            <div class="auth-form-group">
+                <label asp-for="Username" class="auth-label">Tên đăng nhập</label>
+                <input asp-for="Username" class="auth-input" placeholder="Nhập tên đăng nhập của bạn..." autocomplete="username" required />
+                <span asp-validation-for="Username" class="auth-validation-error"></span>
             </div>
+            
+            <div class="auth-form-group">
+                <label asp-for="Password" class="auth-label">Mật khẩu</label>
+                <div class="auth-password-group">
+                    <input asp-for="Password" type="password" class="auth-input" placeholder="Nhập mật khẩu của bạn..." autocomplete="current-password" required />
+                    <button type="button" class="auth-password-toggle" onclick="togglePassword()">
+                        👁️
+                    </button>
+                </div>
+                <span asp-validation-for="Password" class="auth-validation-error"></span>
+            </div>
+            
+            <div class="auth-remember-group">
+                <input type="checkbox" class="auth-remember-checkbox" id="rememberMe" name="RememberMe" />
+                <label for="rememberMe" class="auth-remember-label">Ghi nhớ đăng nhập</label>
+            </div>
+            
+            <button type="submit" class="auth-submit-btn">
+                🚀 Đăng nhập
+            </button>
+        </form>
+
+        <div class="auth-security-info">
+            <span class="auth-security-icon">🔒</span>
+            <span class="auth-security-text">Kết nối của bạn được bảo mật với mã hóa SSL</span>
+        </div>
+
+        <div class="auth-links">
+            <p style="color: #6b7280; margin-bottom: 1rem;">
+                Chưa có tài khoản?
+            </p>
+            <a href="#" class="auth-link">📝 Đăng ký ngay</a>
+            <a href="#" class="auth-link">🔑 Quên mật khẩu?</a>
         </div>
     </div>
-</div> 
+</div>
+
+<script>
+function togglePassword() {
+    const passwordInput = document.querySelector('input[type="password"]');
+    const toggleButton = document.querySelector('.auth-password-toggle');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleButton.textContent = '🙈';
+    } else {
+        passwordInput.type = 'password';
+        toggleButton.textContent = '👁️';
+    }
+}
+
+// Enhanced form submission
+document.querySelector('.auth-form').addEventListener('submit', function(e) {
+    const submitButton = document.querySelector('.auth-submit-btn');
+    submitButton.classList.add('loading');
+    submitButton.textContent = '⏳ Đang đăng nhập...';
+});
+</script> 
