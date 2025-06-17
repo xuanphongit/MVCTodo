@@ -3,6 +3,11 @@ name: Deploy to IIS using Web Deploy
 on:
   push:
     branches: [ "master", "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+      - '!.github/workflows/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -13,6 +18,7 @@ on:
         options:
         - production
         - staging
+        - development
       force_deploy:
         description: 'Force deployment (skip health checks)'
         required: false
@@ -25,325 +31,434 @@ on:
         type: choice
         options:
         - auto
-        - wmsvc
-        - inproc
+        - package
+        - folder
+      skip_tests:
+        description: 'Skip running tests'
+        required: false
+        default: false
+        type: boolean
 
 env:
   PROJECT_PATH: './Todo.csproj'
   PUBLISH_PATH: './publish'
   PACKAGE_PATH: './package'
-  IIS_SITE_NAME: 'TodoMVCApp'
-  IIS_APP_POOL: 'TodoMVCAppPool'
-  IIS_SITE_PATH: 'C:\inetpub\wwwroot\TodoApp'
-  BACKUP_PATH: 'C:\Deployments\Backups'
-  WEB_DEPLOY_SERVER: 'localhost'
-  WEB_DEPLOY_USERNAME: 'Administrator'  # Or IIS Manager user
+  DOTNET_VERSION: '8.0.x'
+  # Environment-specific variables will be set based on input
+  DEPLOYMENT_TIMEOUT: 300 # 5 minutes
 
 jobs:
   build-and-deploy:
     name: Build and Deploy using Web Deploy
     runs-on: self-hosted
+    timeout-minutes: 30
+    environment: ${{ inputs.environment || 'production' }}
+    
+    # Set environment variables based on deployment target
+    env:
+      IIS_SITE_NAME: ${{ inputs.environment == 'staging' && 'TodoMVCApp-Staging' || inputs.environment == 'development' && 'TodoMVCApp-Dev' || 'TodoMVCApp' }}
+      IIS_APP_POOL: ${{ inputs.environment == 'staging' && 'TodoMVCAppPool-Staging' || inputs.environment == 'development' && 'TodoMVCAppPool-Dev' || 'TodoMVCAppPool' }}
+      IIS_SITE_PATH: ${{ inputs.environment == 'staging' && 'C:\inetpub\wwwroot\TodoApp-Staging' || inputs.environment == 'development' && 'C:\inetpub\wwwroot\TodoApp-Dev' || 'C:\inetpub\wwwroot\TodoApp' }}
+      BACKUP_PATH: 'C:\Deployments\Backups'
+      WEB_DEPLOY_SERVER: ${{ secrets.WEB_DEPLOY_SERVER || 'localhost' }}
+      WEB_DEPLOY_USERNAME: ${{ secrets.WEB_DEPLOY_USERNAME }}
+      WEB_DEPLOY_PASSWORD: ${{ secrets.WEB_DEPLOY_PASSWORD }}
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 1
+        fetch-depth: 0 # Get full history for better change detection
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Display Environment Info
       shell: powershell
       run: |
-        Write-Host "=== Web Deploy Deployment Information ==="
+        Write-Host "=== Web Deploy Deployment Information ===" -ForegroundColor Cyan
         Write-Host "Runner OS: $env:RUNNER_OS"
         Write-Host "Workflow: ${{ github.workflow }}"
         Write-Host "Branch: ${{ github.ref_name }}"
         Write-Host "Commit: ${{ github.sha }}"
         Write-Host "Environment: ${{ inputs.environment || 'production' }}"
         Write-Host "Web Deploy Method: ${{ inputs.web_deploy_method || 'auto' }}"
-        Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
         Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
         Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
-        Write-Host "============================================="
+        Write-Host "Deployment Timeout: ${{ env.DEPLOYMENT_TIMEOUT }}s"
+        Write-Host "=============================================" -ForegroundColor Cyan
 
-    - name: Check Web Deploy Installation
+    - name: Validate Prerequisites
       shell: powershell
       run: |
-        Write-Host "=== CHECKING WEB DEPLOY INSTALLATION ==="
+        Write-Host "=== VALIDATING PREREQUISITES ===" -ForegroundColor Yellow
         
-        # Check if Web Deploy is installed
-        $webDeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-        $webDeployPath32 = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        $errors = @()
+        
+        # Check if running as Administrator
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+        if ($isAdmin) {
+          Write-Host "[✓] Running as Administrator" -ForegroundColor Green
+        } else {
+          $errors += "Not running as Administrator - some operations may fail"
+          Write-Warning "[!] Not running as Administrator"
+        }
+        
+        # Check Web Deploy installation
+        $webDeployPaths = @(
+          "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe",
+          "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        )
         
         $msdeployPath = $null
-        if (Test-Path $webDeployPath) {
-          $msdeployPath = $webDeployPath
-          Write-Host "[SUCCESS] Web Deploy V3 found at: $webDeployPath"
-        } elseif (Test-Path $webDeployPath32) {
-          $msdeployPath = $webDeployPath32
-          Write-Host "[SUCCESS] Web Deploy V3 found at: $webDeployPath32"
+        foreach ($path in $webDeployPaths) {
+          if (Test-Path $path) {
+            $msdeployPath = $path
+            Write-Host "[✓] Web Deploy V3 found at: $path" -ForegroundColor Green
+            break
+          }
+        }
+        
+        if (!$msdeployPath) {
+          $errors += "Web Deploy V3 not found - please install it"
+          Write-Error "[✗] Web Deploy V3 not found!"
         } else {
-          Write-Host "[ERROR] Web Deploy V3 not found!"
-          Write-Host ""
-          Write-Host "Please install Web Deploy V3:"
-          Write-Host "1. Download from: https://www.microsoft.com/en-us/download/details.aspx?id=43717"
-          Write-Host "2. Or use Chocolatey: choco install webdeploy"
-          Write-Host "3. Or use Web Platform Installer"
-          Write-Host ""
-          throw "Web Deploy V3 is required for this deployment method"
+          # Get and validate Web Deploy version
+          try {
+            $version = & "$msdeployPath" -version 2>&1 | Select-String "Microsoft Web Deploy" | Select-Object -First 1
+            Write-Host "[✓] $version" -ForegroundColor Green
+            $env:MSDEPLOY_PATH = $msdeployPath
+          } catch {
+            Write-Warning "[!] Could not get Web Deploy version: $($_.Exception.Message)"
+          }
         }
         
-        # Get Web Deploy version
-        try {
-          $version = & "$msdeployPath" -version 2>&1 | Select-String "Microsoft Web Deploy" | Select-Object -First 1
-          Write-Host "[INFO] $version"
-        } catch {
-          Write-Warning "[WARNING] Could not get Web Deploy version: $($_.Exception.Message)"
-        }
-        
-        # Set environment variable for later steps
-        Write-Host "##vso[task.setvariable variable=MSDEPLOY_PATH]$msdeployPath"
-        $env:MSDEPLOY_PATH = $msdeployPath
-        
-        # Check .NET installation
+        # Check .NET SDK
         try {
           $dotnetVersion = dotnet --version
-          Write-Host "[SUCCESS] .NET SDK Version: $dotnetVersion"
+          Write-Host "[✓] .NET SDK Version: $dotnetVersion" -ForegroundColor Green
         } catch {
-          Write-Error "[ERROR] .NET SDK not found. Please install .NET 8.0 SDK"
-          throw "Missing .NET SDK"
+          $errors += ".NET SDK not found - please install .NET ${{ env.DOTNET_VERSION }} SDK"
+          Write-Error "[✗] .NET SDK not found"
         }
         
-        Write-Host "[SUCCESS] Prerequisites check completed"
+        # Check IIS installation
+        try {
+          $iisService = Get-Service W3SVC -ErrorAction SilentlyContinue
+          if ($iisService) {
+            Write-Host "[✓] IIS Service Status: $($iisService.Status)" -ForegroundColor Green
+          } else {
+            $errors += "IIS service not found - please install IIS"
+            Write-Error "[✗] IIS service not found"
+          }
+        } catch {
+          Write-Warning "[!] Could not check IIS service: $($_.Exception.Message)"
+        }
+        
+        # Check disk space (minimum 1GB free)
+        try {
+          $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'"
+          $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
+          if ($freeSpaceGB -gt 1) {
+            Write-Host "[✓] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
+          } else {
+            $errors += "Insufficient disk space (${freeSpaceGB}GB available, minimum 1GB required)"
+            Write-Warning "[!] Low disk space: ${freeSpaceGB}GB"
+          }
+        } catch {
+          Write-Warning "[!] Could not check disk space: $($_.Exception.Message)"
+        }
+        
+        # Summary
+        if ($errors.Count -eq 0) {
+          Write-Host "[SUCCESS] All prerequisites validated successfully" -ForegroundColor Green
+        } else {
+          Write-Host "[WARNING] Prerequisites validation completed with warnings:" -ForegroundColor Yellow
+          foreach ($error in $errors) {
+            Write-Host "  - $error" -ForegroundColor Yellow
+          }
+          Write-Host ""
+          Write-Host "Deployment will continue but may encounter issues." -ForegroundColor Yellow
+          Write-Host "For best results, please resolve the above warnings." -ForegroundColor Yellow
+        }
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
       shell: powershell
       run: |
-        Write-Host "Restoring NuGet packages..."
-        dotnet restore ${{ env.PROJECT_PATH }}
-        if ($LASTEXITCODE -ne 0) {
-          throw "Package restore failed"
+        Write-Host "=== RESTORING DEPENDENCIES ===" -ForegroundColor Yellow
+        
+        try {
+          dotnet restore ${{ env.PROJECT_PATH }} --verbosity minimal
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Package restore completed successfully" -ForegroundColor Green
+          } else {
+            throw "Package restore failed with exit code: $LASTEXITCODE"
+          }
+        } catch {
+          Write-Error "Package restore failed: $($_.Exception.Message)"
+          throw
         }
-        Write-Host "[SUCCESS] Package restore completed successfully"
 
     - name: Build application
       shell: powershell
       run: |
-        Write-Host "Building application in Release mode..."
-        dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
-        if ($LASTEXITCODE -ne 0) {
-          throw "Build failed"
+        Write-Host "=== BUILDING APPLICATION ===" -ForegroundColor Yellow
+        
+        try {
+          dotnet build ${{ env.PROJECT_PATH }} `
+            --configuration Release `
+            --no-restore `
+            --verbosity minimal `
+            --property:PublishUrl=${{ env.IIS_SITE_PATH }}
+            
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Build completed successfully" -ForegroundColor Green
+          } else {
+            throw "Build failed with exit code: $LASTEXITCODE"
+          }
+        } catch {
+          Write-Error "Build failed: $($_.Exception.Message)"
+          throw
         }
-        Write-Host "[SUCCESS] Build completed successfully"
 
-    - name: Run tests (if available)
+    - name: Run tests
+      if: ${{ inputs.skip_tests != 'true' }}
       shell: powershell
-      continue-on-error: true
       run: |
-        Write-Host "Running tests..."
+        Write-Host "=== RUNNING TESTS ===" -ForegroundColor Yellow
+        
         $testProjects = Get-ChildItem -Recurse -Filter "*Test*.csproj" -File
         if ($testProjects.Count -gt 0) {
-          dotnet test --configuration Release --no-build --verbosity normal
-          Write-Host "[SUCCESS] Tests completed"
-        } else {
-          Write-Host "[INFO] No test projects found, skipping tests"
-        }
-
-    - name: Publish application for Web Deploy
-      shell: powershell
-      run: |
-        Write-Host "=== PUBLISHING APPLICATION FOR WEB DEPLOY ==="
-        
-        # Clean previous publish
-        if (Test-Path ${{ env.PUBLISH_PATH }}) {
-          Remove-Item -Path ${{ env.PUBLISH_PATH }} -Recurse -Force
-          Write-Host "Cleaned existing publish directory"
-        }
-        
-        if (Test-Path ${{ env.PACKAGE_PATH }}) {
-          Remove-Item -Path ${{ env.PACKAGE_PATH }} -Recurse -Force
-          Write-Host "Cleaned existing package directory"
-        }
-        
-        # Publish application
-        Write-Host "Publishing application..."
-        dotnet publish ${{ env.PROJECT_PATH }} `
-          --configuration Release `
-          --no-build `
-          --output ${{ env.PUBLISH_PATH }} `
-          --self-contained false `
-          --verbosity normal
-          
-        if ($LASTEXITCODE -ne 0) {
-          throw "Publish failed"
-        }
-        
-        Write-Host "[SUCCESS] Application published successfully"
-        
-        # Create Web Deploy package using MSDeploy (more reliable method)
-        Write-Host "Creating Web Deploy package..."
-        
-        # Create package directory
-        if (!(Test-Path ${{ env.PACKAGE_PATH }})) {
-          New-Item -ItemType Directory -Path ${{ env.PACKAGE_PATH }} -Force | Out-Null
-          Write-Host "[INFO] Created package directory: ${{ env.PACKAGE_PATH }}"
-        }
-        
-        # Try to find MSDeploy
-        $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-        if (!(Test-Path $msdeployPath)) {
-          $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-        }
-        
-        # Check admin privileges for package creation
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        
-        if (Test-Path $msdeployPath) {
-          if ($isAdmin) {
-            try {
-              Write-Host "Using MSDeploy to create package: $msdeployPath"
-              Write-Host "Source: ${{ env.PUBLISH_PATH }}"
-              Write-Host "Package: ${{ env.PACKAGE_PATH }}\TodoApp.zip"
-              
-              # Test if IIS is accessible before creating package
-              try {
-                & "$msdeployPath" -verb:getDependencies -source:iisApp="Default Web Site" 2>$null | Out-Null
-                $iisAccessible = $LASTEXITCODE -eq 0
-              } catch {
-                $iisAccessible = $false
-              }
-              
-              if ($iisAccessible) {
-                & "$msdeployPath" `
-                  -verb:sync `
-                  -source:contentPath="${{ env.PUBLISH_PATH }}" `
-                  -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
-                  -verbose
-                  
-                if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
-                  $packageInfo = Get-Item "${{ env.PACKAGE_PATH }}\TodoApp.zip"
-                  Write-Host "[SUCCESS] Web Deploy package created successfully"
-                  Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
-                  Write-Host "Package location: $($packageInfo.FullName)"
-                } else {
-                  Write-Warning "[WARNING] MSDeploy package creation failed with exit code: $LASTEXITCODE"
-                  Write-Host "[INFO] Will use direct folder deployment instead"
-                }
+          try {
+            Write-Host "Found $($testProjects.Count) test project(s)"
+            dotnet test --configuration Release --no-build --verbosity minimal --logger trx
+            
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] All tests passed" -ForegroundColor Green
+            } else {
+              Write-Error "Tests failed with exit code: $LASTEXITCODE"
+              if ("${{ inputs.force_deploy }}" -ne "true") {
+                throw "Tests failed - deployment aborted"
               } else {
-                Write-Host "[INFO] IIS not accessible for package creation"
-                Write-Host "[INFO] This is normal when IIS is not fully configured or accessible"
-                Write-Host "[INFO] Will use direct folder deployment instead"
+                Write-Warning "Tests failed but force_deploy is enabled - continuing with deployment"
               }
-            } catch {
-              Write-Warning "[WARNING] MSDeploy package creation failed: $($_.Exception.Message)"
-              Write-Host "[INFO] Will use direct folder deployment instead"
             }
-          } else {
-            Write-Host "[INFO] Skipping package creation - requires Administrator privileges"
-            Write-Host "[INFO] Package creation needs admin rights to access IIS configuration"
-            Write-Host "[INFO] Will use direct folder deployment instead"
+          } catch {
+            Write-Error "Test execution failed: $($_.Exception.Message)"
+            if ("${{ inputs.force_deploy }}" -ne "true") {
+              throw
+            }
           }
         } else {
-          Write-Host "[INFO] MSDeploy not found, will use direct folder deployment"
-          Write-Host "[INFO] Published files are ready for deployment from: ${{ env.PUBLISH_PATH }}"
+          Write-Host "[INFO] No test projects found, skipping tests" -ForegroundColor Cyan
         }
-        
-        # Show what we have for deployment
-        Write-Host ""
-        Write-Host "=== DEPLOYMENT ASSETS SUMMARY ==="
-        Write-Host "Published files directory: ${{ env.PUBLISH_PATH }}"
-        if (Test-Path "${{ env.PUBLISH_PATH }}") {
-          $publishedFiles = Get-ChildItem -Path "${{ env.PUBLISH_PATH }}" -Recurse -File
-          Write-Host "Published files count: $($publishedFiles.Count)"
-          Write-Host "Published directory size: $([math]::Round((Get-ChildItem -Path '${{ env.PUBLISH_PATH }}' -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB, 2)) MB"
-        }
-        
-        if (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip") {
-          Write-Host "Web Deploy package: ${{ env.PACKAGE_PATH }}\TodoApp.zip (AVAILABLE)"
-        } else {
-          Write-Host "Web Deploy package: Not created (will use folder deployment)"
-        }
-        Write-Host "=== END DEPLOYMENT ASSETS SUMMARY ==="
-        
-        # Note: Package creation failure is expected without admin privileges
-        # This should not fail the workflow as folder deployment is available
 
-    # ================================
-    # WEB DEPLOY SITE MANAGEMENT 
-    # ================================
-    - name: Web Deploy - Create IIS Site and App Pool
+    - name: Publish application
       shell: powershell
       run: |
-        Write-Host "=== WEB DEPLOY - IIS SITE MANAGEMENT ==="
+        Write-Host "=== PUBLISHING APPLICATION ===" -ForegroundColor Yellow
+        
+        # Clean previous publish artifacts
+        @("${{ env.PUBLISH_PATH }}", "${{ env.PACKAGE_PATH }}") | ForEach-Object {
+          if (Test-Path $_) {
+            Remove-Item -Path $_ -Recurse -Force
+            Write-Host "Cleaned existing directory: $_"
+          }
+        }
+        
+        try {
+          # Publish application
+          dotnet publish ${{ env.PROJECT_PATH }} `
+            --configuration Release `
+            --no-build `
+            --output ${{ env.PUBLISH_PATH }} `
+            --self-contained false `
+            --verbosity minimal `
+            --property:PublishUrl=${{ env.IIS_SITE_PATH }}
+            
+          if ($LASTEXITCODE -ne 0) {
+            throw "Publish failed with exit code: $LASTEXITCODE"
+          }
+          
+          # Verify publish output
+          if (Test-Path ${{ env.PUBLISH_PATH }}) {
+            $publishedFiles = Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse -File
+            $totalSize = ($publishedFiles | Measure-Object -Property Length -Sum).Sum
+            Write-Host "[SUCCESS] Application published successfully" -ForegroundColor Green
+            Write-Host "Published files: $($publishedFiles.Count)"
+            Write-Host "Total size: $([math]::Round($totalSize / 1MB, 2)) MB"
+          } else {
+            throw "Publish directory not found after publish operation"
+          }
+          
+        } catch {
+          Write-Error "Publish failed: $($_.Exception.Message)"
+          throw
+        }
+
+    - name: Create Web Deploy package
+      shell: powershell
+      run: |
+        Write-Host "=== CREATING WEB DEPLOY PACKAGE ===" -ForegroundColor Yellow
+        
+        $msdeployPath = $env:MSDEPLOY_PATH
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+        
+        if (!$msdeployPath) {
+          Write-Warning "MSDeploy path not set - skipping package creation"
+          exit 0
+        }
+        
+        # Create package directory
+        New-Item -ItemType Directory -Path ${{ env.PACKAGE_PATH }} -Force | Out-Null
+        
+        if ($isAdmin) {
+          try {
+            Write-Host "Creating Web Deploy package..."
+            
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:contentPath="${{ env.PUBLISH_PATH }}" `
+              -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
+              -verbose
+              
+            if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
+              $packageInfo = Get-Item "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+              Write-Host "[SUCCESS] Web Deploy package created successfully" -ForegroundColor Green
+              Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
+              Write-Host "Package location: $($packageInfo.FullName)"
+            } else {
+              Write-Warning "Package creation failed - will use folder deployment"
+            }
+          } catch {
+            Write-Warning "Package creation failed: $($_.Exception.Message)"
+          }
+        } else {
+          Write-Host "[INFO] Skipping package creation - requires Administrator privileges"
+        }
+
+    - name: Create backup
+      shell: powershell
+      run: |
+        Write-Host "=== CREATING BACKUP ===" -ForegroundColor Yellow
+        
+        $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $backupDir = "${{ env.BACKUP_PATH }}\${timestamp}-${{ github.sha }}"
+        
+        try {
+          # Ensure backup directory exists
+          if (!(Test-Path ${{ env.BACKUP_PATH }})) {
+            New-Item -ItemType Directory -Path ${{ env.BACKUP_PATH }} -Force | Out-Null
+            Write-Host "Created backup root directory: ${{ env.BACKUP_PATH }}"
+          }
+          
+          # Create backup if current deployment exists
+          if (Test-Path ${{ env.IIS_SITE_PATH }}) {
+            Write-Host "Creating backup of current deployment..."
+            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+            
+            # Copy current deployment with error handling
+            robocopy "${{ env.IIS_SITE_PATH }}" "$backupDir" /E /R:3 /W:5 /MT:8 /XD logs temp /XF *.log *.tmp
+            
+            # Robocopy exit codes 0-7 are success (8+ are errors)
+            if ($LASTEXITCODE -le 7) {
+              Write-Host "[SUCCESS] Backup created: $backupDir" -ForegroundColor Green
+              
+              # Save backup info for potential rollback
+              @{
+                BackupPath = $backupDir
+                Timestamp = $timestamp
+                Commit = "${{ github.sha }}"
+                Environment = "${{ inputs.environment || 'production' }}"
+              } | ConvertTo-Json | Out-File "$backupDir\backup-info.json"
+              
+            } else {
+              Write-Warning "Backup creation had issues (exit code: $LASTEXITCODE)"
+            }
+            
+            # Clean up old backups (keep last 10)
+            $oldBackups = Get-ChildItem -Path ${{ env.BACKUP_PATH }} -Directory | 
+                         Sort-Object CreationTime -Descending | 
+                         Select-Object -Skip 10
+            
+            if ($oldBackups) {
+              Write-Host "Cleaning up $($oldBackups.Count) old backup(s)..."
+              $oldBackups | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            
+          } else {
+            Write-Host "[INFO] No existing deployment found - skipping backup"
+          }
+          
+        } catch {
+          Write-Warning "Backup creation failed: $($_.Exception.Message)"
+          Write-Host "Deployment will continue without backup"
+        }
+
+    # ================================
+    # IIS SITE AND APPLICATION POOL SETUP
+    # ================================
+    - name: Setup IIS Application Pool and Website
+      shell: powershell
+      run: |
+        Write-Host "=== SETTING UP IIS APPLICATION POOL AND WEBSITE ===" -ForegroundColor Yellow
         
         # Check admin privileges
         $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
         Write-Host "[INFO] Running as Administrator: $isAdmin"
         
-        if (!$isAdmin) {
-          Write-Host "[WARNING] Web Deploy operations require Administrator privileges"
-          Write-Host "[INFO] Some operations may fail or be skipped"
-          Write-Host ""
-          Write-Host "============================================"
-          Write-Host "⚠️  ADMINISTRATOR PRIVILEGES REQUIRED"
-          Write-Host "============================================"
-          Write-Host ""
-          Write-Host "To fix this issue, please:"
-          Write-Host "1. Stop the GitHub Actions runner service:"
-          Write-Host "   Stop-Service -Name 'actions.runner.*'"
-          Write-Host ""
-          Write-Host "2. Run PowerShell as Administrator and restart the runner:"
-          Write-Host "   cd C:\actions-runner"
-          Write-Host "   .\run.cmd"
-          Write-Host ""
-          Write-Host "3. Or install runner as service with admin privileges:"
-          Write-Host "   .\svc.sh install"
-          Write-Host "   .\svc.sh start"
-          Write-Host ""
-          Write-Host "============================================"
-          Write-Host ""
-          Write-Host "[INFO] Will attempt limited operations..."
-        }
-        
-        $msdeployPath = $env:MSDEPLOY_PATH
-        if (!$msdeployPath) {
-          $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          if (!(Test-Path $msdeployPath)) {
-            $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          }
-        }
-        
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $appPoolName = "${{ env.IIS_APP_POOL }}"
         $sitePath = "${{ env.IIS_SITE_PATH }}"
+        $environment = "${{ inputs.environment || 'production' }}"
         
-        Write-Host "Using MSDeploy: $msdeployPath"
+        if (!$isAdmin) {
+          Write-Host "[WARNING] Limited functionality without Administrator privileges" -ForegroundColor Yellow
+          Write-Host "[INFO] Some IIS management operations may be skipped"
+        }
         
-        # Create deployment directory with proper error handling
-        Write-Host "Creating deployment directory: $sitePath"
+        # Ensure deployment directory exists with proper permissions
+        Write-Host "Setting up deployment directory: $sitePath"
         try {
           if (!(Test-Path $sitePath)) {
             if ($isAdmin) {
+              # Create directory structure
               New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
-              Write-Host "[SUCCESS] Created deployment directory: $sitePath"
-            } else {
-              Write-Warning "[WARNING] Cannot create directory without admin privileges"
-              Write-Host "[INFO] Please create directory manually: $sitePath"
-              Write-Host "[INFO] Or run the setup script as Administrator:"
-              Write-Host "       .\scripts\setup-webdeploy.ps1"
+              New-Item -ItemType Directory -Path "$sitePath\logs" -Force -ErrorAction SilentlyContinue | Out-Null
+              New-Item -ItemType Directory -Path "$sitePath\App_Data" -Force -ErrorAction SilentlyContinue | Out-Null
               
-              # Try to create in a location we might have access to
-              $tempSitePath = "$env:TEMP\TodoApp"
-              Write-Host "[INFO] Creating temporary directory for testing: $tempSitePath"
-              New-Item -ItemType Directory -Path $tempSitePath -Force | Out-Null
-              Write-Host "[SUCCESS] Temporary directory created - deployment will continue with limited functionality"
+              Write-Host "[SUCCESS] Created deployment directory: $sitePath" -ForegroundColor Green
+              
+              # Set proper permissions for IIS
+              try {
+                icacls $sitePath /grant "IIS_IUSRS:(OI)(CI)R" /T /Q | Out-Null
+                icacls $sitePath /grant "IUSR:(OI)(CI)R" /T /Q | Out-Null
+                icacls "$sitePath\logs" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null | Out-Null
+                icacls "$sitePath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null | Out-Null
+                Write-Host "[SUCCESS] Set IIS permissions on deployment directory" -ForegroundColor Green
+              } catch {
+                Write-Warning "Could not set all permissions: $($_.Exception.Message)"
+              }
+            } else {
+              Write-Warning "Cannot create deployment directory without admin privileges"
+              Write-Host "[INFO] Please create directory manually or run as Administrator"
             }
           } else {
-            Write-Host "[INFO] Deployment directory already exists: $sitePath"
+            Write-Host "[INFO] Deployment directory already exists: $sitePath" -ForegroundColor Cyan
           }
         } catch {
-          Write-Warning "[WARNING] Failed to create deployment directory: $($_.Exception.Message)"
-          Write-Host "[INFO] This may prevent deployment from completing successfully"
-          Write-Host "[INFO] Please ensure the directory exists and has proper permissions"
+          Write-Warning "Failed to create deployment directory: $($_.Exception.Message)"
         }
         
         # Create Application Pool using Web Deploy
@@ -481,45 +596,19 @@ jobs:
         Write-Host "[SUCCESS] IIS Site management completed"
 
     # ================================
-    # WEB DEPLOY APPLICATION DEPLOYMENT
+    # APPLICATION DEPLOYMENT
     # ================================
-    - name: Create backup before deployment
+    - name: Deploy Application
       shell: powershell
+      timeout-minutes: 15
       run: |
-        Write-Host "=== CREATING BACKUP ==="
+        Write-Host "=== DEPLOYING APPLICATION ===" -ForegroundColor Yellow
         
-        $backupDir = "${{ env.BACKUP_PATH }}\$(Get-Date -Format 'yyyyMMdd-HHmmss')-${{ github.sha }}"
-        
-        if (!(Test-Path ${{ env.BACKUP_PATH }})) {
-          New-Item -ItemType Directory -Path ${{ env.BACKUP_PATH }} -Force | Out-Null
-          Write-Host "Created backup directory: ${{ env.BACKUP_PATH }}"
-        }
-        
-        if (Test-Path ${{ env.IIS_SITE_PATH }}) {
-          Write-Host "Backing up current deployment to: $backupDir"
-          New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-          Copy-Item -Path "${{ env.IIS_SITE_PATH }}\*" -Destination $backupDir -Recurse -Force
-          Write-Host "[SUCCESS] Backup created successfully"
-          
-          # Keep only last 5 backups
-          $oldBackups = Get-ChildItem -Path ${{ env.BACKUP_PATH }} -Directory | Sort-Object CreationTime -Descending | Select-Object -Skip 5
-          if ($oldBackups) {
-            Write-Host "Cleaning up old backups..."
-            $oldBackups | Remove-Item -Recurse -Force
-            Write-Host "Removed $($oldBackups.Count) old backup(s)"
-          }
-        } else {
-          Write-Host "[INFO] No existing deployment found, skipping backup"
-        }
-
-    - name: Web Deploy - Deploy Application
-      shell: powershell
-      run: |
-        Write-Host "=== WEB DEPLOY - APPLICATION DEPLOYMENT ==="
-        
-        # Check admin privileges
+        # Initialize deployment variables
         $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        Write-Host "[INFO] Running as Administrator: $isAdmin"
+        $deploymentSuccess = $false
+        $deploymentMethod = "unknown"
+        $startTime = Get-Date
         
         $msdeployPath = $env:MSDEPLOY_PATH
         if (!$msdeployPath) {
@@ -859,94 +948,221 @@ jobs:
           }
         }
 
-    - name: Health Check
+    - name: Application Health Check
       if: ${{ inputs.force_deploy != 'true' }}
       shell: powershell
+      timeout-minutes: 5
       run: |
-        Write-Host "=== HEALTH CHECK ==="
+        Write-Host "=== APPLICATION HEALTH CHECK ===" -ForegroundColor Yellow
         
-        # Check if deployment was to temp directory
-        $targetPath = "${{ env.IIS_SITE_PATH }}"
-        $tempPath = "$env:TEMP\TodoApp_Deploy_Test"
+        $siteName = "${{ env.IIS_SITE_NAME }}"
+        $environment = "${{ inputs.environment || 'production' }}"
+        $maxAttempts = 12
+        $delaySeconds = 10
         
-        if (Test-Path $tempPath) {
-          $tempFiles = Get-ChildItem -Path $tempPath -Recurse -File -ErrorAction SilentlyContinue
-          if ($tempFiles.Count -gt 0) {
-            Write-Host "[INFO] Deployment was to temporary directory - skipping health check"
-            Write-Host "[INFO] Health check will be available after manual copy to IIS directory"
-            Write-Host "[INFO] Run: .\scripts\manual-copy-deployment.ps1"
-            exit 0
-          }
+        # Determine health check URL based on environment
+        $healthCheckUrls = @()
+        if ($environment -eq "production") {
+          $healthCheckUrls += "http://localhost"
+          $healthCheckUrls += "http://127.0.0.1"
+        } else {
+          $healthCheckUrls += "http://localhost/$siteName"
+          $healthCheckUrls += "http://127.0.0.1/$siteName"
         }
         
-        Write-Host "Performing application health check..."
+        Write-Host "Health check URLs: $($healthCheckUrls -join ', ')"
+        Write-Host "Max attempts: $maxAttempts, Delay: ${delaySeconds}s"
         
-        $maxAttempts = 10
-        $delaySeconds = 5
-        $healthCheckUrl = "http://localhost"
+        $healthCheckPassed = $false
         
-        for ($i = 1; $i -le $maxAttempts; $i++) {
-          try {
-            Write-Host "Health check attempt $i of $maxAttempts..."
-            
-            $response = Invoke-WebRequest -Uri $healthCheckUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
-            
-            if ($response.StatusCode -eq 200) {
-              Write-Host "[SUCCESS] Application is healthy! Status Code: $($response.StatusCode)"
-              Write-Host "Response length: $($response.Content.Length) characters"
-              break
-            } else {
-              Write-Warning "[WARNING] Unexpected status code: $($response.StatusCode)"
+        foreach ($url in $healthCheckUrls) {
+          Write-Host "Testing URL: $url" -ForegroundColor Cyan
+          
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+            try {
+              Write-Host "  Attempt $i/$maxAttempts..."
+              
+              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+              
+              if ($response.StatusCode -eq 200) {
+                Write-Host "[SUCCESS] Application is healthy!" -ForegroundColor Green
+                Write-Host "  URL: $url"
+                Write-Host "  Status Code: $($response.StatusCode)"
+                Write-Host "  Response Size: $($response.Content.Length) bytes"
+                Write-Host "  Response Time: $(((Get-Date) - $startTime).TotalSeconds) seconds"
+                $healthCheckPassed = $true
+                break
+              } else {
+                Write-Warning "  Unexpected status code: $($response.StatusCode)"
+              }
+              
+            } catch {
+              Write-Warning "  Health check failed: $($_.Exception.Message)"
+              
+              if ($i -lt $maxAttempts) {
+                Write-Host "  Waiting ${delaySeconds}s before retry..."
+                Start-Sleep -Seconds $delaySeconds
+              }
             }
-            
-          } catch {
-            Write-Warning "[WARNING] Health check attempt $i failed: $($_.Exception.Message)"
-            
-            if ($i -eq $maxAttempts) {
-              Write-Error "Health check failed after $maxAttempts attempts"
-              throw "Deployment failed health check"
-            }
-            
-            Write-Host "Waiting $delaySeconds seconds before next attempt..."
-            Start-Sleep -Seconds $delaySeconds
+          }
+          
+          if ($healthCheckPassed) { break }
+        }
+        
+        if (!$healthCheckPassed) {
+          Write-Error "Health check failed for all URLs after $maxAttempts attempts each"
+          Write-Host ""
+          Write-Host "Troubleshooting steps:"
+          Write-Host "1. Check IIS Manager - ensure site is started"
+          Write-Host "2. Check Application Pool - ensure it's running"
+          Write-Host "3. Check Windows Event Logs for errors"
+          Write-Host "4. Verify .NET runtime is installed"
+          Write-Host "5. Check file permissions on deployment directory"
+          
+          if ("${{ inputs.force_deploy }}" -eq "true") {
+            Write-Warning "Health check failed but continuing due to force_deploy flag"
+          } else {
+            throw "Deployment health check failed"
           }
         }
 
-    - name: Deployment Summary
+    - name: Deployment Summary and Cleanup
+      if: always()
       shell: powershell
       run: |
-        Write-Host "=== WEB DEPLOY DEPLOYMENT SUMMARY ==="
+        Write-Host "=== DEPLOYMENT SUMMARY ===" -ForegroundColor Cyan
         
-        # Check deployment status
-        $targetPath = "${{ env.IIS_SITE_PATH }}"
-        $tempPath = "$env:TEMP\TodoApp_Deploy_Test"
+        $endTime = Get-Date
+        $deploymentDuration = if ($startTime) { ($endTime - $startTime).TotalMinutes } else { 0 }
+        $environment = "${{ inputs.environment || 'production' }}"
+        $success = $env:GITHUB_JOB_STATUS -eq 'success'
         
-        if (Test-Path $tempPath) {
-          $tempFiles = Get-ChildItem -Path $tempPath -Recurse -File -ErrorAction SilentlyContinue
-          if ($tempFiles.Count -gt 0) {
-            Write-Host "Deployment completed successfully to temporary directory!"
+        Write-Host ""
+        Write-Host "📊 Deployment Metrics:" -ForegroundColor White
+        Write-Host "  Environment: $environment"
+        Write-Host "  Status: $(if($success){'✅ SUCCESS'}else{'❌ FAILED'})"
+        Write-Host "  Duration: $([math]::Round($deploymentDuration, 2)) minutes"
+        Write-Host "  Method: ${{ inputs.web_deploy_method || 'auto' }}"
+        Write-Host "  Branch: ${{ github.ref_name }}"
+        Write-Host "  Commit: ${{ github.sha }}"
+        Write-Host "  Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
+        
+        Write-Host ""
+        Write-Host "🎯 Deployment Details:" -ForegroundColor White
+        Write-Host "  IIS Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "  App Pool: ${{ env.IIS_APP_POOL }}"
+        Write-Host "  Deploy Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "  Backup Path: ${{ env.BACKUP_PATH }}"
+        
+        # Show deployed files info if deployment succeeded
+        if (Test-Path "${{ env.IIS_SITE_PATH }}") {
+          try {
+            $files = Get-ChildItem -Path "${{ env.IIS_SITE_PATH }}" -Recurse -File -ErrorAction SilentlyContinue
+            $totalSize = ($files | Measure-Object -Property Length -Sum).Sum
+            Write-Host "  Deployed Files: $($files.Count)"
+            Write-Host "  Total Size: $([math]::Round($totalSize / 1MB, 2)) MB"
+          } catch {
+            Write-Warning "Could not get deployment file statistics"
+          }
+        }
+        
+        Write-Host ""
+        if ($success) {
+          Write-Host "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
+          Write-Host ""
+          Write-Host "Next Steps:" -ForegroundColor Yellow
+          Write-Host "  • Verify application functionality"
+          Write-Host "  • Monitor application logs"
+          Write-Host "  • Check performance metrics"
+          Write-Host "  • Update monitoring dashboards"
+          
+          if ($environment -eq "production") {
             Write-Host ""
-            Write-Host "📋 MANUAL STEP REQUIRED:"
-            Write-Host "Files are ready in temporary directory. To complete deployment:"
-            Write-Host "   .\scripts\manual-copy-deployment.ps1"
-          } else {
-            Write-Host "Deployment completed successfully!"
+            Write-Host "Production Checklist:" -ForegroundColor Magenta
+            Write-Host "  • SSL certificate configured"
+            Write-Host "  • Security headers enabled"
+            Write-Host "  • Monitoring alerts active"
+            Write-Host "  • Backup verification"
           }
         } else {
-          Write-Host "Deployment completed successfully!"
+          Write-Host "💥 DEPLOYMENT FAILED!" -ForegroundColor Red
+          Write-Host ""
+          Write-Host "Troubleshooting Resources:" -ForegroundColor Yellow
+          Write-Host "  • Check GitHub Actions logs above"
+          Write-Host "  • Review Windows Event Logs"
+          Write-Host "  • Verify IIS configuration"
+          Write-Host "  • Check file permissions"
+          Write-Host "  • Consult WEB-DEPLOY-TROUBLESHOOTING.md"
+          
+          # Show rollback information
+          $latestBackup = Get-ChildItem -Path "${{ env.BACKUP_PATH }}" -Directory -ErrorAction SilentlyContinue | 
+                         Sort-Object CreationTime -Descending | 
+                         Select-Object -First 1
+          
+          if ($latestBackup) {
+            Write-Host ""
+            Write-Host "🔄 Rollback Available:" -ForegroundColor Cyan
+            Write-Host "  Latest backup: $($latestBackup.Name)"
+            Write-Host "  Location: $($latestBackup.FullName)"
+            Write-Host "  To rollback: Copy contents to ${{ env.IIS_SITE_PATH }}"
+          }
         }
+        
         Write-Host ""
-        Write-Host "Details:"
-        Write-Host "- Method: Microsoft Web Deploy V3"
-        Write-Host "- Branch: ${{ github.ref_name }}"
-        Write-Host "- Commit: ${{ github.sha }}"
-        Write-Host "- Environment: ${{ inputs.environment || 'production' }}"
-        Write-Host "- Deploy Method: ${{ inputs.web_deploy_method || 'auto' }}"
-        Write-Host "- IIS Site: ${{ env.IIS_SITE_NAME }}"
-        Write-Host "- App Pool: ${{ env.IIS_APP_POOL }}"
-        Write-Host "- Deploy Path: ${{ env.IIS_SITE_PATH }}"
-        Write-Host "- Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host "📞 Support:" -ForegroundColor White
+        Write-Host "  • Documentation: README.md, DEPLOYMENT.md"
+        Write-Host "  • Troubleshooting: WEB-DEPLOY-TROUBLESHOOTING.md"
+        Write-Host "  • Scripts: scripts/ directory"
         Write-Host ""
-        Write-Host "Application URL: http://localhost"
-        Write-Host ""
-        Write-Host "[SUCCESS] Web Deploy deployment completed successfully!" 
+        Write-Host "===============================================" -ForegroundColor Cyan
+
+    - name: Notify Deployment Status
+      if: always()
+      shell: powershell
+      run: |
+        $success = $env:GITHUB_JOB_STATUS -eq 'success'
+        $environment = "${{ inputs.environment || 'production' }}"
+        $webhook = "${{ secrets.TEAMS_WEBHOOK_URL }}"
+        
+        if ($webhook) {
+          try {
+            $status = if ($success) { "✅ SUCCESS" } else { "❌ FAILED" }
+            $color = if ($success) { "good" } else { "danger" }
+            
+            $payload = @{
+              "@type" = "MessageCard"
+              "@context" = "http://schema.org/extensions"
+              "themeColor" = $color
+              "summary" = "Deployment $status"
+              "sections" = @(
+                @{
+                  "activityTitle" = "Todo MVC App Deployment"
+                  "activitySubtitle" = "Environment: $environment"
+                  "facts" = @(
+                    @{ "name" = "Status"; "value" = $status },
+                    @{ "name" = "Environment"; "value" = $environment },
+                    @{ "name" = "Branch"; "value" = "${{ github.ref_name }}" },
+                    @{ "name" = "Commit"; "value" = "${{ github.sha }}" },
+                    @{ "name" = "Workflow"; "value" = "${{ github.workflow }}" }
+                  )
+                }
+              )
+              "potentialAction" = @(
+                @{
+                  "@type" = "OpenUri"
+                  "name" = "View Workflow"
+                  "targets" = @(
+                    @{ "os" = "default"; "uri" = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" }
+                  )
+                }
+              )
+            } | ConvertTo-Json -Depth 10
+            
+            Invoke-RestMethod -Uri $webhook -Method Post -Body $payload -ContentType "application/json"
+            Write-Host "Notification sent successfully"
+          } catch {
+            Write-Warning "Failed to send notification: $($_.Exception.Message)"
+          }
+        } else {
+          Write-Host "No webhook configured - skipping notification"
+        } 
