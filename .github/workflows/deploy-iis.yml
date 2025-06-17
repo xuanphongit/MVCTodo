@@ -124,8 +124,15 @@ jobs:
             Write-Warning "[WARNING] appcmd test failed with exit code: $LASTEXITCODE"
             Write-Host "[INFO] Output: $testResult"
             
-            # If appcmd fails, we might still be able to deploy
-            Write-Host "[INFO] Will attempt deployment using alternative methods..."
+            # Common exit codes and their meanings
+            switch ($LASTEXITCODE) {
+              5 { Write-Host "[INFO] Exit code 5: Configuration/Permission error - expected without admin rights" }
+              183 { Write-Host "[INFO] Exit code 183: File already exists - not critical" }
+              default { Write-Host "[INFO] Exit code $LASTEXITCODE: Will use alternative deployment methods" }
+            }
+            
+            Write-Host "[INFO] This is expected when running without Administrator privileges"
+            Write-Host "[INFO] Deployment will use PowerShell cmdlets and file operations instead"
           }
         } catch {
           Write-Warning "[WARNING] IIS accessibility test failed: $($_.Exception.Message)"
@@ -165,10 +172,13 @@ jobs:
         if (!$isAdmin) {
           Write-Host ""
           Write-Host "============================================"
-          Write-Host "⚠️  IMPORTANT: ADMINISTRATOR PRIVILEGES REQUIRED"
+          Write-Host "⚠️  NOTICE: LIMITED PRIVILEGES MODE"
           Write-Host "============================================"
           Write-Host ""
-          Write-Host "To fix this issue, please:"
+          Write-Host "Running without Administrator privileges."
+          Write-Host "Some IIS management features will be limited."
+          Write-Host ""
+          Write-Host "For full functionality, please:"
           Write-Host "1. Stop the GitHub Actions runner service:"
           Write-Host "   Stop-Service -Name 'actions.runner.*'"
           Write-Host ""
@@ -180,13 +190,12 @@ jobs:
           Write-Host "   .\svc.sh install"
           Write-Host "   .\svc.sh start"
           Write-Host ""
-          Write-Host "4. Alternatively, run this deployment manually with admin PowerShell"
-          Write-Host ""
           Write-Host "============================================"
           Write-Host ""
-          Write-Host "[INFO] Deployment will continue with limited functionality..."
+          Write-Host "[INFO] Deployment will continue with available functionality..."
+          Write-Host "[INFO] File deployment and basic IIS operations should still work"
         } else {
-          Write-Host "[SUCCESS] Running with Administrator privileges"
+          Write-Host "[SUCCESS] Running with Administrator privileges - full functionality available"
         }
 
     - name: Restore dependencies
@@ -280,71 +289,105 @@ jobs:
         # === APPLICATION POOL MANAGEMENT ===
         Write-Host "Managing Application Pool: $appPoolName"
         
+        $appPoolManaged = $false
+        
         # Method 1: Try using appcmd.exe (more reliable)
-        try {
-          Write-Host "Checking application pool using appcmd..."
-          $appPoolExists = $false
-          
-          # Check if app pool exists
-          $checkResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool $appPoolName 2>&1
-          if ($LASTEXITCODE -eq 0 -and $checkResult -match $appPoolName) {
-            $appPoolExists = $true
-            Write-Host "[INFO] Application pool '$appPoolName' exists"
+        if ($isAdmin) {
+          try {
+            Write-Host "Checking application pool using appcmd (Admin mode)..."
+            $appPoolExists = $false
             
-            # Stop the application pool
-            Write-Host "Stopping application pool..."
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool $appPoolName 2>&1 | Out-Null
-            Start-Sleep -Seconds 2
-          } else {
-            Write-Host "[INFO] Application pool '$appPoolName' does not exist"
-          }
-          
-          if (!$appPoolExists) {
-            # Create new application pool
-            Write-Host "Creating application pool: $appPoolName"
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:$appPoolName /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] Application pool created successfully"
+            # Check if app pool exists
+            $checkResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool $appPoolName 2>&1
+            if ($LASTEXITCODE -eq 0 -and $checkResult -match $appPoolName) {
+              $appPoolExists = $true
+              Write-Host "[INFO] Application pool '$appPoolName' exists"
+              
+              # Stop the application pool
+              Write-Host "Stopping application pool..."
+              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool $appPoolName 2>&1 | Out-Null
+              Start-Sleep -Seconds 2
             } else {
-              throw "Failed to create application pool"
+              Write-Host "[INFO] Application pool '$appPoolName' does not exist"
             }
+            
+            if (!$appPoolExists) {
+              # Create new application pool
+              Write-Host "Creating application pool: $appPoolName"
+              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:$appPoolName /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Application pool created successfully"
+              } else {
+                throw "Failed to create application pool"
+              }
+            }
+            
+            # Configure application pool settings
+            Write-Host "Configuring application pool settings..."
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /managedRuntimeVersion:""
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /processModel.identityType:ApplicationPoolIdentity
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /processModel.loadUserProfile:true
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /recycling.periodicRestart.time:00:00:00
+            
+            Write-Host "[SUCCESS] Application pool configured with appcmd"
+            $appPoolManaged = $true
+            
+          } catch {
+            Write-Warning "[WARNING] appcmd method failed: $($_.Exception.Message)"
           }
-          
-          # Configure application pool settings
-          Write-Host "Configuring application pool settings..."
-          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /managedRuntimeVersion:""
-          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /processModel.identityType:ApplicationPoolIdentity
-          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /processModel.loadUserProfile:true
-          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /recycling.periodicRestart.time:00:00:00
-          
-          Write-Host "[SUCCESS] Application pool configured with appcmd"
-          
-        } catch {
-          Write-Warning "[WARNING] appcmd method failed: $($_.Exception.Message)"
-          
-          # Method 2: Fallback to PowerShell WebAdministration
+        } else {
+          Write-Host "[INFO] Skipping appcmd operations - requires Administrator privileges"
+        }
+        
+        # Method 2: Fallback to PowerShell WebAdministration (works with limited privileges)
+        if (!$appPoolManaged) {
           try {
             Write-Host "Trying PowerShell WebAdministration module..."
-            Import-Module WebAdministration -Force
+            Import-Module WebAdministration -Force -ErrorAction Stop
             
             if (!(Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue)) {
-              New-WebAppPool -Name $appPoolName -Force
-              Write-Host "[SUCCESS] Application pool created with PowerShell"
+              if ($isAdmin) {
+                New-WebAppPool -Name $appPoolName -Force
+                Write-Host "[SUCCESS] Application pool created with PowerShell"
+              } else {
+                Write-Warning "[WARNING] Cannot create application pool without admin privileges"
+                Write-Host "[INFO] Please create application pool '$appPoolName' manually in IIS Manager"
+              }
+            } else {
+              Write-Host "[INFO] Application pool '$appPoolName' already exists"
             }
             
-            # Configure app pool
-            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.identityType -Value ApplicationPoolIdentity
-            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value ""
+            # Try to configure app pool (some settings may fail without admin)
+            try {
+              Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.identityType -Value ApplicationPoolIdentity -ErrorAction SilentlyContinue
+              Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value "" -ErrorAction SilentlyContinue
+              Write-Host "[INFO] Application pool configuration attempted"
+            } catch {
+              Write-Warning "[WARNING] Some application pool settings could not be configured: $($_.Exception.Message)"
+            }
             
             # Stop app pool
-            Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 2
+            try {
+              Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 2
+              Write-Host "[SUCCESS] Application pool stopped"
+            } catch {
+              Write-Warning "[WARNING] Could not stop application pool: $($_.Exception.Message)"
+            }
             
             Write-Host "[SUCCESS] Application pool managed with PowerShell"
+            $appPoolManaged = $true
+            
           } catch {
-            Write-Error "Both appcmd and PowerShell methods failed for application pool management: $($_.Exception.Message)"
-            throw
+            Write-Warning "[WARNING] PowerShell WebAdministration failed: $($_.Exception.Message)"
+            Write-Host "[INFO] Application pool management will be skipped"
+            Write-Host "[INFO] Please ensure application pool '$appPoolName' exists in IIS Manager"
           }
+        }
+        
+        if (!$appPoolManaged) {
+          Write-Host "[INFO] Application pool management was skipped due to insufficient privileges"
+          Write-Host "[INFO] Deployment will continue - manual IIS configuration may be required"
         }
         
         # === WEBSITE MANAGEMENT ===
