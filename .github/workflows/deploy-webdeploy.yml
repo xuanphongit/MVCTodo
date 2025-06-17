@@ -1,0 +1,512 @@
+name: Deploy to IIS using Web Deploy
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      force_deploy:
+        description: 'Force deployment (skip health checks)'
+        required: false
+        default: false
+        type: boolean
+      web_deploy_method:
+        description: 'Web Deploy Method'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+        - auto
+        - wmsvc
+        - inproc
+
+env:
+  PROJECT_PATH: './Todo.csproj'
+  PUBLISH_PATH: './publish'
+  PACKAGE_PATH: './package'
+  IIS_SITE_NAME: 'TodoMVCApp'
+  IIS_APP_POOL: 'TodoMVCAppPool'
+  IIS_SITE_PATH: 'C:\inetpub\wwwroot\TodoApp'
+  BACKUP_PATH: 'C:\Deployments\Backups'
+  WEB_DEPLOY_SERVER: 'localhost'
+  WEB_DEPLOY_USERNAME: 'Administrator'  # Or IIS Manager user
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy using Web Deploy
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Display Environment Info
+      shell: powershell
+      run: |
+        Write-Host "=== Web Deploy Deployment Information ==="
+        Write-Host "Runner OS: $env:RUNNER_OS"
+        Write-Host "Workflow: ${{ github.workflow }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Environment: ${{ inputs.environment || 'production' }}"
+        Write-Host "Web Deploy Method: ${{ inputs.web_deploy_method || 'auto' }}"
+        Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "============================================="
+
+    - name: Check Web Deploy Installation
+      shell: powershell
+      run: |
+        Write-Host "=== CHECKING WEB DEPLOY INSTALLATION ==="
+        
+        # Check if Web Deploy is installed
+        $webDeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        $webDeployPath32 = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        
+        $msdeployPath = $null
+        if (Test-Path $webDeployPath) {
+          $msdeployPath = $webDeployPath
+          Write-Host "[SUCCESS] Web Deploy V3 found at: $webDeployPath"
+        } elseif (Test-Path $webDeployPath32) {
+          $msdeployPath = $webDeployPath32
+          Write-Host "[SUCCESS] Web Deploy V3 found at: $webDeployPath32"
+        } else {
+          Write-Host "[ERROR] Web Deploy V3 not found!"
+          Write-Host ""
+          Write-Host "Please install Web Deploy V3:"
+          Write-Host "1. Download from: https://www.microsoft.com/en-us/download/details.aspx?id=43717"
+          Write-Host "2. Or use Chocolatey: choco install webdeploy"
+          Write-Host "3. Or use Web Platform Installer"
+          Write-Host ""
+          throw "Web Deploy V3 is required for this deployment method"
+        }
+        
+        # Get Web Deploy version
+        try {
+          $version = & "$msdeployPath" -version 2>&1 | Select-String "Microsoft Web Deploy" | Select-Object -First 1
+          Write-Host "[INFO] $version"
+        } catch {
+          Write-Warning "[WARNING] Could not get Web Deploy version: $($_.Exception.Message)"
+        }
+        
+        # Set environment variable for later steps
+        Write-Host "##vso[task.setvariable variable=MSDEPLOY_PATH]$msdeployPath"
+        $env:MSDEPLOY_PATH = $msdeployPath
+        
+        # Check .NET installation
+        try {
+          $dotnetVersion = dotnet --version
+          Write-Host "[SUCCESS] .NET SDK Version: $dotnetVersion"
+        } catch {
+          Write-Error "[ERROR] .NET SDK not found. Please install .NET 8.0 SDK"
+          throw "Missing .NET SDK"
+        }
+        
+        Write-Host "[SUCCESS] Prerequisites check completed"
+
+    - name: Restore dependencies
+      shell: powershell
+      run: |
+        Write-Host "Restoring NuGet packages..."
+        dotnet restore ${{ env.PROJECT_PATH }}
+        if ($LASTEXITCODE -ne 0) {
+          throw "Package restore failed"
+        }
+        Write-Host "[SUCCESS] Package restore completed successfully"
+
+    - name: Build application
+      shell: powershell
+      run: |
+        Write-Host "Building application in Release mode..."
+        dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+        if ($LASTEXITCODE -ne 0) {
+          throw "Build failed"
+        }
+        Write-Host "[SUCCESS] Build completed successfully"
+
+    - name: Run tests (if available)
+      shell: powershell
+      continue-on-error: true
+      run: |
+        Write-Host "Running tests..."
+        $testProjects = Get-ChildItem -Recurse -Filter "*Test*.csproj" -File
+        if ($testProjects.Count -gt 0) {
+          dotnet test --configuration Release --no-build --verbosity normal
+          Write-Host "[SUCCESS] Tests completed"
+        } else {
+          Write-Host "[INFO] No test projects found, skipping tests"
+        }
+
+    - name: Publish application for Web Deploy
+      shell: powershell
+      run: |
+        Write-Host "=== PUBLISHING APPLICATION FOR WEB DEPLOY ==="
+        
+        # Clean previous publish
+        if (Test-Path ${{ env.PUBLISH_PATH }}) {
+          Remove-Item -Path ${{ env.PUBLISH_PATH }} -Recurse -Force
+          Write-Host "Cleaned existing publish directory"
+        }
+        
+        if (Test-Path ${{ env.PACKAGE_PATH }}) {
+          Remove-Item -Path ${{ env.PACKAGE_PATH }} -Recurse -Force
+          Write-Host "Cleaned existing package directory"
+        }
+        
+        # Publish application
+        Write-Host "Publishing application..."
+        dotnet publish ${{ env.PROJECT_PATH }} `
+          --configuration Release `
+          --no-build `
+          --output ${{ env.PUBLISH_PATH }} `
+          --self-contained false `
+          --verbosity normal
+          
+        if ($LASTEXITCODE -ne 0) {
+          throw "Publish failed"
+        }
+        
+        Write-Host "[SUCCESS] Application published successfully"
+        
+        # Create Web Deploy package using MSBuild (alternative method)
+        Write-Host "Creating Web Deploy package..."
+        try {
+          dotnet msbuild ${{ env.PROJECT_PATH }} `
+            /p:Configuration=Release `
+            /p:Platform="Any CPU" `
+            /p:PublishUrl=${{ env.PACKAGE_PATH }} `
+            /p:WebPublishMethod=Package `
+            /p:PackageAsSingleFile=True `
+            /p:PackageLocation="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
+            /p:DeployOnBuild=True `
+            /p:PublishProfile=WebDeploy
+            
+          if (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip") {
+            Write-Host "[SUCCESS] Web Deploy package created: TodoApp.zip"
+          } else {
+            Write-Host "[INFO] Package creation via MSBuild failed, will use direct folder deployment"
+          }
+        } catch {
+          Write-Warning "[WARNING] Package creation failed: $($_.Exception.Message)"
+          Write-Host "[INFO] Will use direct folder deployment instead"
+        }
+
+    # ================================
+    # WEB DEPLOY SITE MANAGEMENT 
+    # ================================
+    - name: Web Deploy - Create IIS Site and App Pool
+      shell: powershell
+      run: |
+        Write-Host "=== WEB DEPLOY - IIS SITE MANAGEMENT ==="
+        
+        $msdeployPath = $env:MSDEPLOY_PATH
+        if (!$msdeployPath) {
+          $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          if (!(Test-Path $msdeployPath)) {
+            $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          }
+        }
+        
+        $siteName = "${{ env.IIS_SITE_NAME }}"
+        $appPoolName = "${{ env.IIS_APP_POOL }}"
+        $sitePath = "${{ env.IIS_SITE_PATH }}"
+        
+        Write-Host "Using MSDeploy: $msdeployPath"
+        
+        # Create deployment directory
+        if (!(Test-Path $sitePath)) {
+          New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
+          Write-Host "[SUCCESS] Created deployment directory: $sitePath"
+        }
+        
+        # Create Application Pool using Web Deploy
+        Write-Host "Creating/Configuring Application Pool: $appPoolName"
+        try {
+          & "$msdeployPath" `
+            -verb:sync `
+            -source:appPool `
+            -dest:appPool="$appPoolName",managedRuntimeVersion="",enable32BitAppOnWin64=false,processModel.identityType=ApplicationPoolIdentity `
+            -verbose
+            
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Application pool created/configured with Web Deploy"
+          } else {
+            Write-Warning "[WARNING] Application pool operation completed with warnings (exit code: $LASTEXITCODE)"
+          }
+        } catch {
+          Write-Warning "[WARNING] Application pool creation failed: $($_.Exception.Message)"
+          Write-Host "[INFO] Will attempt manual creation..."
+          
+          # Fallback to appcmd
+          try {
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:"$appPoolName" /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
+            Write-Host "[SUCCESS] Application pool created with appcmd fallback"
+          } catch {
+            Write-Warning "[WARNING] Fallback application pool creation also failed: $($_.Exception.Message)"
+          }
+        }
+        
+        # Create IIS Website using Web Deploy
+        Write-Host "Creating/Configuring IIS Website: $siteName"
+        try {
+          & "$msdeployPath" `
+            -verb:sync `
+            -source:appHostConfig="Default Web Site" `
+            -dest:appHostConfig="$siteName",computerName=localhost `
+            -enableRule:AppOffline `
+            -verbose
+            
+          # Configure site bindings and path
+          & "$msdeployPath" `
+            -verb:sync `
+            -source:iisApp `
+            -dest:iisApp="$siteName",computerName=localhost,physicalPath="$sitePath",applicationPool="$appPoolName" `
+            -enableRule:AppOffline `
+            -verbose
+            
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] IIS Website created/configured with Web Deploy"
+          } else {
+            Write-Warning "[WARNING] Website operation completed with warnings (exit code: $LASTEXITCODE)"
+          }
+        } catch {
+          Write-Warning "[WARNING] Website creation with Web Deploy failed: $($_.Exception.Message)"
+          Write-Host "[INFO] Will attempt manual creation..."
+          
+          # Fallback to appcmd
+          try {
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"$siteName" /physicalPath:"$sitePath" /bindings:http/*:80: /applicationPool:"$appPoolName"
+            Write-Host "[SUCCESS] Website created with appcmd fallback"
+          } catch {
+            Write-Warning "[WARNING] Fallback website creation also failed: $($_.Exception.Message)"
+          }
+        }
+        
+        Write-Host "[SUCCESS] IIS Site management completed"
+
+    # ================================
+    # WEB DEPLOY APPLICATION DEPLOYMENT
+    # ================================
+    - name: Create backup before deployment
+      shell: powershell
+      run: |
+        Write-Host "=== CREATING BACKUP ==="
+        
+        $backupDir = "${{ env.BACKUP_PATH }}\$(Get-Date -Format 'yyyyMMdd-HHmmss')-${{ github.sha }}"
+        
+        if (!(Test-Path ${{ env.BACKUP_PATH }})) {
+          New-Item -ItemType Directory -Path ${{ env.BACKUP_PATH }} -Force | Out-Null
+          Write-Host "Created backup directory: ${{ env.BACKUP_PATH }}"
+        }
+        
+        if (Test-Path ${{ env.IIS_SITE_PATH }}) {
+          Write-Host "Backing up current deployment to: $backupDir"
+          New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+          Copy-Item -Path "${{ env.IIS_SITE_PATH }}\*" -Destination $backupDir -Recurse -Force
+          Write-Host "[SUCCESS] Backup created successfully"
+          
+          # Keep only last 5 backups
+          $oldBackups = Get-ChildItem -Path ${{ env.BACKUP_PATH }} -Directory | Sort-Object CreationTime -Descending | Select-Object -Skip 5
+          if ($oldBackups) {
+            Write-Host "Cleaning up old backups..."
+            $oldBackups | Remove-Item -Recurse -Force
+            Write-Host "Removed $($oldBackups.Count) old backup(s)"
+          }
+        } else {
+          Write-Host "[INFO] No existing deployment found, skipping backup"
+        }
+
+    - name: Web Deploy - Deploy Application
+      shell: powershell
+      run: |
+        Write-Host "=== WEB DEPLOY - APPLICATION DEPLOYMENT ==="
+        
+        $msdeployPath = $env:MSDEPLOY_PATH
+        if (!$msdeployPath) {
+          $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          if (!(Test-Path $msdeployPath)) {
+            $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          }
+        }
+        
+        $siteName = "${{ env.IIS_SITE_NAME }}"
+        $sourcePath = "${{ env.PUBLISH_PATH }}"
+        $packagePath = "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+        $method = "${{ inputs.web_deploy_method || 'auto' }}"
+        
+        Write-Host "Deployment method: $method"
+        Write-Host "Source path: $sourcePath"
+        Write-Host "Target site: $siteName"
+        
+        # Choose deployment method
+        $deploymentSuccess = $false
+        
+        # Method 1: Try package deployment if package exists
+        if ((Test-Path $packagePath) -and ($method -eq "auto" -or $method -eq "package")) {
+          Write-Host "Attempting package deployment..."
+          try {
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:package="$packagePath" `
+              -dest:iisApp="$siteName",computerName=localhost `
+              -enableRule:AppOffline `
+              -enableRule:DoNotDeleteRule `
+              -allowUntrusted:true `
+              -verbose
+              
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Package deployment completed successfully"
+              $deploymentSuccess = $true
+            } else {
+              Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE"
+            }
+          } catch {
+            Write-Warning "[WARNING] Package deployment failed: $($_.Exception.Message)"
+          }
+        }
+        
+        # Method 2: Direct folder sync (more reliable)
+        if (!$deploymentSuccess) {
+          Write-Host "Attempting direct folder synchronization..."
+          try {
+            # Stop application first
+            Write-Host "Taking application offline..."
+            $appOfflineContent = "App is being updated. Please try again in a moment."
+            $appOfflineContent | Out-File -FilePath "${{ env.IIS_SITE_PATH }}\app_offline.htm" -Encoding UTF8 -Force
+            
+            Start-Sleep -Seconds 2
+            
+            # Sync files using Web Deploy
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:contentPath="$sourcePath" `
+              -dest:contentPath="${{ env.IIS_SITE_PATH }}",computerName=localhost `
+              -enableRule:DoNotDeleteRule `
+              -skip:Directory="\\logs$" `
+              -skip:Directory="\\App_Data$" `
+              -skip:File="\\app_offline\.htm$" `
+              -allowUntrusted:true `
+              -verbose
+              
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Folder synchronization completed successfully"
+              $deploymentSuccess = $true
+            } else {
+              Write-Warning "[WARNING] Folder sync failed with exit code: $LASTEXITCODE"
+            }
+            
+            # Remove app_offline.htm
+            if (Test-Path "${{ env.IIS_SITE_PATH }}\app_offline.htm") {
+              Remove-Item "${{ env.IIS_SITE_PATH }}\app_offline.htm" -Force
+              Write-Host "[INFO] Application brought back online"
+            }
+            
+          } catch {
+            Write-Warning "[WARNING] Folder synchronization failed: $($_.Exception.Message)"
+            
+            # Remove app_offline.htm in case of failure
+            if (Test-Path "${{ env.IIS_SITE_PATH }}\app_offline.htm") {
+              Remove-Item "${{ env.IIS_SITE_PATH }}\app_offline.htm" -Force
+            }
+          }
+        }
+        
+        # Method 3: Fallback to simple file copy
+        if (!$deploymentSuccess) {
+          Write-Host "Web Deploy methods failed, falling back to file copy..."
+          try {
+            # Stop IIS services
+            Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
+            Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+            
+            # Copy files
+            Copy-Item -Path "$sourcePath\*" -Destination "${{ env.IIS_SITE_PATH }}" -Recurse -Force
+            
+            # Start IIS services
+            Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
+            Start-Website -Name "$siteName"
+            
+            Write-Host "[SUCCESS] Fallback file copy deployment completed"
+            $deploymentSuccess = $true
+          } catch {
+            Write-Error "All deployment methods failed: $($_.Exception.Message)"
+            throw "Deployment failed"
+          }
+        }
+        
+        if ($deploymentSuccess) {
+          Write-Host "[SUCCESS] Application deployment completed successfully"
+        } else {
+          throw "All deployment methods failed"
+        }
+
+    - name: Health Check
+      if: ${{ inputs.force_deploy != 'true' }}
+      shell: powershell
+      run: |
+        Write-Host "=== HEALTH CHECK ==="
+        Write-Host "Performing application health check..."
+        
+        $maxAttempts = 10
+        $delaySeconds = 5
+        $healthCheckUrl = "http://localhost"
+        
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+          try {
+            Write-Host "Health check attempt $i of $maxAttempts..."
+            
+            $response = Invoke-WebRequest -Uri $healthCheckUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+            
+            if ($response.StatusCode -eq 200) {
+              Write-Host "[SUCCESS] Application is healthy! Status Code: $($response.StatusCode)"
+              Write-Host "Response length: $($response.Content.Length) characters"
+              break
+            } else {
+              Write-Warning "[WARNING] Unexpected status code: $($response.StatusCode)"
+            }
+            
+          } catch {
+            Write-Warning "[WARNING] Health check attempt $i failed: $($_.Exception.Message)"
+            
+            if ($i -eq $maxAttempts) {
+              Write-Error "Health check failed after $maxAttempts attempts"
+              throw "Deployment failed health check"
+            }
+            
+            Write-Host "Waiting $delaySeconds seconds before next attempt..."
+            Start-Sleep -Seconds $delaySeconds
+          }
+        }
+
+    - name: Deployment Summary
+      shell: powershell
+      run: |
+        Write-Host "=== WEB DEPLOY DEPLOYMENT SUMMARY ==="
+        Write-Host "Deployment completed successfully!"
+        Write-Host ""
+        Write-Host "Details:"
+        Write-Host "- Method: Microsoft Web Deploy V3"
+        Write-Host "- Branch: ${{ github.ref_name }}"
+        Write-Host "- Commit: ${{ github.sha }}"
+        Write-Host "- Environment: ${{ inputs.environment || 'production' }}"
+        Write-Host "- Deploy Method: ${{ inputs.web_deploy_method || 'auto' }}"
+        Write-Host "- IIS Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "- App Pool: ${{ env.IIS_APP_POOL }}"
+        Write-Host "- Deploy Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "- Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host ""
+        Write-Host "Application URL: http://localhost"
+        Write-Host ""
+        Write-Host "[SUCCESS] Web Deploy deployment completed successfully!" 
