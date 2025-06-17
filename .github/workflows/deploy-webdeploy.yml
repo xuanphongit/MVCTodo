@@ -210,6 +210,35 @@ jobs:
       run: |
         Write-Host "=== WEB DEPLOY - IIS SITE MANAGEMENT ==="
         
+        # Check admin privileges
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+        Write-Host "[INFO] Running as Administrator: $isAdmin"
+        
+        if (!$isAdmin) {
+          Write-Host "[WARNING] Web Deploy operations require Administrator privileges"
+          Write-Host "[INFO] Some operations may fail or be skipped"
+          Write-Host ""
+          Write-Host "============================================"
+          Write-Host "⚠️  ADMINISTRATOR PRIVILEGES REQUIRED"
+          Write-Host "============================================"
+          Write-Host ""
+          Write-Host "To fix this issue, please:"
+          Write-Host "1. Stop the GitHub Actions runner service:"
+          Write-Host "   Stop-Service -Name 'actions.runner.*'"
+          Write-Host ""
+          Write-Host "2. Run PowerShell as Administrator and restart the runner:"
+          Write-Host "   cd C:\actions-runner"
+          Write-Host "   .\run.cmd"
+          Write-Host ""
+          Write-Host "3. Or install runner as service with admin privileges:"
+          Write-Host "   .\svc.sh install"
+          Write-Host "   .\svc.sh start"
+          Write-Host ""
+          Write-Host "============================================"
+          Write-Host ""
+          Write-Host "[INFO] Will attempt limited operations..."
+        }
+        
         $msdeployPath = $env:MSDEPLOY_PATH
         if (!$msdeployPath) {
           $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
@@ -224,73 +253,164 @@ jobs:
         
         Write-Host "Using MSDeploy: $msdeployPath"
         
-        # Create deployment directory
-        if (!(Test-Path $sitePath)) {
-          New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
-          Write-Host "[SUCCESS] Created deployment directory: $sitePath"
+        # Create deployment directory with proper error handling
+        Write-Host "Creating deployment directory: $sitePath"
+        try {
+          if (!(Test-Path $sitePath)) {
+            if ($isAdmin) {
+              New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
+              Write-Host "[SUCCESS] Created deployment directory: $sitePath"
+            } else {
+              Write-Warning "[WARNING] Cannot create directory without admin privileges"
+              Write-Host "[INFO] Please create directory manually: $sitePath"
+              Write-Host "[INFO] Or run the setup script as Administrator:"
+              Write-Host "       .\scripts\setup-webdeploy.ps1"
+              
+              # Try to create in a location we might have access to
+              $tempSitePath = "$env:TEMP\TodoApp"
+              Write-Host "[INFO] Creating temporary directory for testing: $tempSitePath"
+              New-Item -ItemType Directory -Path $tempSitePath -Force | Out-Null
+              Write-Host "[SUCCESS] Temporary directory created - deployment will continue with limited functionality"
+            }
+          } else {
+            Write-Host "[INFO] Deployment directory already exists: $sitePath"
+          }
+        } catch {
+          Write-Warning "[WARNING] Failed to create deployment directory: $($_.Exception.Message)"
+          Write-Host "[INFO] This may prevent deployment from completing successfully"
+          Write-Host "[INFO] Please ensure the directory exists and has proper permissions"
         }
         
         # Create Application Pool using Web Deploy
         Write-Host "Creating/Configuring Application Pool: $appPoolName"
-        try {
-          & "$msdeployPath" `
-            -verb:sync `
-            -source:appPool `
-            -dest:appPool="$appPoolName",managedRuntimeVersion="",enable32BitAppOnWin64=false,processModel.identityType=ApplicationPoolIdentity `
-            -verbose
-            
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] Application pool created/configured with Web Deploy"
-          } else {
-            Write-Warning "[WARNING] Application pool operation completed with warnings (exit code: $LASTEXITCODE)"
-          }
-        } catch {
-          Write-Warning "[WARNING] Application pool creation failed: $($_.Exception.Message)"
-          Write-Host "[INFO] Will attempt manual creation..."
-          
-          # Fallback to appcmd
+        $appPoolCreated = $false
+        
+        if ($isAdmin) {
           try {
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:"$appPoolName" /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
-            Write-Host "[SUCCESS] Application pool created with appcmd fallback"
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:appPool `
+              -dest:appPool="$appPoolName",managedRuntimeVersion="",enable32BitAppOnWin64=false,processModel.identityType=ApplicationPoolIdentity `
+              -verbose
+              
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Application pool created/configured with Web Deploy"
+              $appPoolCreated = $true
+            } else {
+              Write-Warning "[WARNING] Application pool operation completed with warnings (exit code: $LASTEXITCODE)"
+            }
           } catch {
-            Write-Warning "[WARNING] Fallback application pool creation also failed: $($_.Exception.Message)"
+            Write-Warning "[WARNING] Application pool creation failed: $($_.Exception.Message)"
           }
+          
+          # Fallback to appcmd if Web Deploy failed
+          if (!$appPoolCreated) {
+            try {
+              Write-Host "[INFO] Attempting fallback with appcmd..."
+              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:"$appPoolName" /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Application pool created with appcmd fallback"
+                $appPoolCreated = $true
+              }
+            } catch {
+              Write-Warning "[WARNING] Fallback application pool creation also failed: $($_.Exception.Message)"
+            }
+          }
+        } else {
+          Write-Host "[INFO] Skipping application pool creation - requires Administrator privileges"
+          Write-Host "[INFO] Please create application pool manually in IIS Manager:"
+          Write-Host "       Name: $appPoolName"
+          Write-Host "       .NET CLR Version: No Managed Code"
+          Write-Host "       Identity: ApplicationPoolIdentity"
         }
         
         # Create IIS Website using Web Deploy
         Write-Host "Creating/Configuring IIS Website: $siteName"
-        try {
-          & "$msdeployPath" `
-            -verb:sync `
-            -source:appHostConfig="Default Web Site" `
-            -dest:appHostConfig="$siteName",computerName=localhost `
-            -enableRule:AppOffline `
-            -verbose
-            
-          # Configure site bindings and path
-          & "$msdeployPath" `
-            -verb:sync `
-            -source:iisApp `
-            -dest:iisApp="$siteName",computerName=localhost,physicalPath="$sitePath",applicationPool="$appPoolName" `
-            -enableRule:AppOffline `
-            -verbose
-            
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] IIS Website created/configured with Web Deploy"
-          } else {
-            Write-Warning "[WARNING] Website operation completed with warnings (exit code: $LASTEXITCODE)"
-          }
-        } catch {
-          Write-Warning "[WARNING] Website creation with Web Deploy failed: $($_.Exception.Message)"
-          Write-Host "[INFO] Will attempt manual creation..."
-          
-          # Fallback to appcmd
+        $websiteCreated = $false
+        
+        if ($isAdmin -and (Test-Path $sitePath)) {
           try {
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"$siteName" /physicalPath:"$sitePath" /bindings:http/*:80: /applicationPool:"$appPoolName"
-            Write-Host "[SUCCESS] Website created with appcmd fallback"
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:appHostConfig="Default Web Site" `
+              -dest:appHostConfig="$siteName",computerName=localhost `
+              -enableRule:AppOffline `
+              -verbose
+              
+            # Configure site bindings and path
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:iisApp `
+              -dest:iisApp="$siteName",computerName=localhost,physicalPath="$sitePath",applicationPool="$appPoolName" `
+              -enableRule:AppOffline `
+              -verbose
+              
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] IIS Website created/configured with Web Deploy"
+              $websiteCreated = $true
+            } else {
+              Write-Warning "[WARNING] Website operation completed with warnings (exit code: $LASTEXITCODE)"
+            }
           } catch {
-            Write-Warning "[WARNING] Fallback website creation also failed: $($_.Exception.Message)"
+            Write-Warning "[WARNING] Website creation with Web Deploy failed: $($_.Exception.Message)"
           }
+          
+          # Fallback to appcmd if Web Deploy failed
+          if (!$websiteCreated) {
+            try {
+              Write-Host "[INFO] Attempting fallback with appcmd..."
+              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"$siteName" /physicalPath:"$sitePath" /bindings:http/*:80: /applicationPool:"$appPoolName"
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Website created with appcmd fallback"
+                $websiteCreated = $true
+              }
+            } catch {
+              Write-Warning "[WARNING] Fallback website creation also failed: $($_.Exception.Message)"
+            }
+          }
+        } else {
+          if (!$isAdmin) {
+            Write-Host "[INFO] Skipping website creation - requires Administrator privileges"
+          } else {
+            Write-Host "[INFO] Skipping website creation - deployment directory does not exist"
+          }
+          Write-Host "[INFO] Please create website manually in IIS Manager:"
+          Write-Host "       Name: $siteName"
+          Write-Host "       Physical Path: $sitePath"
+          Write-Host "       Application Pool: $appPoolName"
+          Write-Host "       Binding: http/*:80:"
+        }
+        
+        # Summary of IIS management results
+        if (!$isAdmin) {
+          Write-Host ""
+          Write-Host "============================================"
+          Write-Host "⚠️  MANUAL IIS SETUP REQUIRED"
+          Write-Host "============================================"
+          Write-Host ""
+          Write-Host "Since deployment is running without Administrator privileges,"
+          Write-Host "please complete the following manual setup in IIS Manager:"
+          Write-Host ""
+          Write-Host "1. Create Application Pool:"
+          Write-Host "   - Name: $appPoolName"
+          Write-Host "   - .NET CLR Version: No Managed Code"
+          Write-Host "   - Identity: ApplicationPoolIdentity"
+          Write-Host ""
+          Write-Host "2. Create Website:"
+          Write-Host "   - Name: $siteName"
+          Write-Host "   - Physical Path: $sitePath"
+          Write-Host "   - Application Pool: $appPoolName"
+          Write-Host "   - Binding: http/*:80:"
+          Write-Host ""
+          Write-Host "3. Create Directory (as Administrator):"
+          Write-Host "   New-Item -ItemType Directory -Path '$sitePath' -Force"
+          Write-Host "   icacls '$sitePath' /grant 'IIS_IUSRS:(OI)(CI)F' /T"
+          Write-Host ""
+          Write-Host "4. Alternative: Run setup script as Administrator:"
+          Write-Host "   .\scripts\setup-webdeploy.ps1"
+          Write-Host ""
+          Write-Host "============================================"
+          Write-Host ""
         }
         
         Write-Host "[SUCCESS] IIS Site management completed"
