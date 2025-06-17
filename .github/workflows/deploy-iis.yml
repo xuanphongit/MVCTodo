@@ -25,7 +25,6 @@ on:
         type: boolean
 
 env:
-  DOTNET_VERSION: '8.0.x'
   PROJECT_PATH: './Todo.csproj'
   PUBLISH_PATH: './publish'
   IIS_SITE_NAME: 'TodoMVCApp'
@@ -43,11 +42,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Display Environment Info
       shell: powershell
