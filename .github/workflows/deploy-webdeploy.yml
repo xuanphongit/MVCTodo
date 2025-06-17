@@ -531,9 +531,9 @@ jobs:
         }
         
         Write-Host "Deployment method: $method"
-        Write-Host "Source path: $sourcePath"
-        Write-Host "Target path: $targetPath"
-        Write-Host "Package path: $packagePath"
+        Write-Host "Source path: ${sourcePath}"
+        Write-Host "Target path: ${targetPath}"
+        Write-Host "Package path: ${packagePath}"
         Write-Host "Target site: $siteName"
         
         # Debug: Show current working directory and file existence
@@ -564,12 +564,12 @@ jobs:
         
         # Ensure target directory exists
         if (!(Test-Path $targetPath)) {
-          Write-Host "Target directory does not exist, attempting to create: $targetPath"
+          Write-Host "Target directory does not exist, attempting to create: ${targetPath}"
           try {
             if ($isAdmin) {
               # Create directory with full path
               New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
-              Write-Host "[SUCCESS] Created target directory: $targetPath"
+              Write-Host "[SUCCESS] Created target directory: ${targetPath}"
               
               # Set proper permissions
               try {
@@ -597,7 +597,7 @@ jobs:
                 # Update target path to temp for this deployment
                 $originalTargetPath = $targetPath
                 $targetPath = $tempPath
-                Write-Host "[INFO] Using temporary target path: $targetPath"
+                Write-Host "[INFO] Using temporary target path: ${targetPath}"
               } catch {
                 Write-Warning "[WARNING] Could not create temporary directory: $($_.Exception.Message)"
               }
@@ -606,7 +606,7 @@ jobs:
             Write-Warning "[WARNING] Failed to create target directory: $($_.Exception.Message)"
           }
         } else {
-          Write-Host "[INFO] Target directory already exists: $targetPath"
+          Write-Host "[INFO] Target directory already exists: ${targetPath}"
         }
         
         # Choose deployment method
@@ -615,7 +615,7 @@ jobs:
         # Method 1: Try package deployment if package exists and we have admin rights
         if ((Test-Path $packagePath) -and $isAdmin -and ($method -eq "auto" -or $method -eq "package")) {
           Write-Host "Attempting package deployment..."
-          Write-Host "Package file: $packagePath"
+          Write-Host "Package file: ${packagePath}"
           Write-Host "Target IIS app: $siteName"
           
           try {
@@ -626,7 +626,7 @@ jobs:
               Join-Path (Get-Location) $packagePath 
             }
             
-            Write-Host "Using absolute package path: $absolutePackagePath"
+            Write-Host "Using absolute package path: ${absolutePackagePath}"
             
             & "$msdeployPath" `
               -verb:sync `
@@ -647,7 +647,7 @@ jobs:
             Write-Warning "[WARNING] Package deployment failed: $($_.Exception.Message)"
           }
         } elseif (!(Test-Path $packagePath)) {
-          Write-Host "[INFO] Package not found, skipping package deployment: $packagePath"
+          Write-Host "[INFO] Package not found, skipping package deployment: ${packagePath}"
         } elseif (!$isAdmin) {
           Write-Host "[INFO] Skipping package deployment - requires Administrator privileges"
         }
@@ -665,8 +665,8 @@ jobs:
             }
             
             # Sync files using Web Deploy
-            Write-Host "Syncing from: $sourcePath"
-            Write-Host "Syncing to: $targetPath"
+            Write-Host "Syncing from: ${sourcePath}"
+            Write-Host "Syncing to: ${targetPath}"
             
             # Use absolute paths for both source and destination
             $absoluteSourcePath = if ([System.IO.Path]::IsPathRooted($sourcePath)) { 
@@ -675,7 +675,7 @@ jobs:
               Join-Path (Get-Location) $sourcePath 
             }
             
-            Write-Host "Using absolute source path: $absoluteSourcePath"
+            Write-Host "Using absolute source path: ${absoluteSourcePath}"
             
             & "$msdeployPath" `
               -verb:sync `
@@ -710,7 +710,7 @@ jobs:
             }
           }
         } elseif (!(Test-Path $targetPath)) {
-          Write-Host "[INFO] Skipping Web Deploy sync - target directory does not exist: $targetPath"
+          Write-Host "[INFO] Skipping Web Deploy sync - target directory does not exist: ${targetPath}"
         }
         
         # Method 3: Fallback to simple file copy
@@ -731,7 +731,7 @@ jobs:
             }
             
             # Copy files
-            Write-Host "Copying files from $sourcePath to $targetPath..."
+            Write-Host "Copying files from ${sourcePath} to ${targetPath}..."
             
             # Use absolute paths for file copy
             $absoluteSourcePath = if ([System.IO.Path]::IsPathRooted($sourcePath)) { 
@@ -740,7 +740,7 @@ jobs:
               Join-Path (Get-Location) $sourcePath 
             }
             
-            Write-Host "Using absolute source path for copy: $absoluteSourcePath"
+            Write-Host "Using absolute source path for copy: ${absoluteSourcePath}"
             
             if (Test-Path $absoluteSourcePath) {
               Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
@@ -750,7 +750,7 @@ jobs:
               $copiedFiles = Get-ChildItem -Path $targetPath -Recurse -File | Measure-Object
               Write-Host "[INFO] Copied $($copiedFiles.Count) files to target directory"
             } else {
-              Write-Error "Source path does not exist: $absoluteSourcePath"
+              Write-Error "Source path does not exist: ${absoluteSourcePath}"
               throw "Source path not found for file copy"
             }
             
@@ -783,7 +783,7 @@ jobs:
           # Display deployed files
           if (Test-Path $targetPath) {
             Write-Host ""
-            Write-Host "Deployed files in $targetPath:"
+            Write-Host "Deployed files in ${targetPath}:"
             Get-ChildItem -Path $targetPath | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
           }
         } else {
