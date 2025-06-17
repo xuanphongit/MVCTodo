@@ -1,10 +1,6 @@
 name: Security Scan - OWASP & GitLeaks v8.26.0
 
 on:
-  push:
-    branches: [ "master", "main" ]
-  pull_request:
-    branches: [ "master", "main" ]
   schedule:
     # Run weekly on Sundays at 2 AM UTC
     - cron: '0 2 * * 0'
