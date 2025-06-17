@@ -61,7 +61,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) {
           throw "Package restore failed"
         }
-        Write-Host "✅ Package restore completed successfully"
+        Write-Host "[SUCCESS] Package restore completed successfully"
 
     - name: Build application
       shell: powershell
@@ -71,7 +71,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) {
           throw "Build failed"
         }
-        Write-Host "✅ Build completed successfully"
+        Write-Host "[SUCCESS] Build completed successfully"
 
     - name: Run tests (if available)
       shell: powershell
@@ -81,9 +81,9 @@ jobs:
         $testProjects = Get-ChildItem -Recurse -Filter "*Test*.csproj" -File
         if ($testProjects.Count -gt 0) {
           dotnet test --configuration Release --no-build --verbosity normal
-          Write-Host "✅ Tests completed"
+          Write-Host "[SUCCESS] Tests completed"
         } else {
-          Write-Host "ℹ️ No test projects found, skipping tests"
+          Write-Host "[INFO] No test projects found, skipping tests"
         }
 
     - name: Publish application
@@ -106,7 +106,7 @@ jobs:
           throw "Publish failed"
         }
         
-        Write-Host "✅ Application published successfully"
+        Write-Host "[SUCCESS] Application published successfully"
         Write-Host "Published files:"
         Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 
@@ -126,7 +126,7 @@ jobs:
           Write-Host "Backing up current deployment to: $backupDir"
           New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
           Copy-Item -Path "${{ env.IIS_SITE_PATH }}\*" -Destination $backupDir -Recurse -Force
-          Write-Host "✅ Backup created successfully"
+          Write-Host "[SUCCESS] Backup created successfully"
           
           # Keep only last 5 backups
           $oldBackups = Get-ChildItem -Path ${{ env.BACKUP_PATH }} -Directory | Sort-Object CreationTime -Descending | Select-Object -Skip 5
@@ -136,7 +136,7 @@ jobs:
             Write-Host "Removed $($oldBackups.Count) old backup(s)"
           }
         } else {
-          Write-Host "ℹ️ No existing deployment found, skipping backup"
+          Write-Host "[INFO] No existing deployment found, skipping backup"
         }
 
     - name: Stop IIS Application Pool
@@ -164,12 +164,12 @@ jobs:
           } while ($state -ne "Stopped" -and $elapsed -lt $timeout)
           
           if ($state -eq "Stopped") {
-            Write-Host "✅ Application pool stopped successfully"
+            Write-Host "[SUCCESS] Application pool stopped successfully"
           } else {
-            Write-Warning "⚠️ Application pool did not stop within timeout, continuing anyway"
+            Write-Warning "[WARNING] Application pool did not stop within timeout, continuing anyway"
           }
         } else {
-          Write-Host "ℹ️ Application pool does not exist, will be created during deployment"
+          Write-Host "[INFO] Application pool does not exist, will be created during deployment"
         }
 
     - name: Deploy to IIS
@@ -196,7 +196,7 @@ jobs:
         $acl.SetAccessRule($accessRule2)
         Set-Acl -Path ${{ env.IIS_SITE_PATH }} -AclObject $acl
         
-        Write-Host "✅ Application files deployed successfully"
+        Write-Host "[SUCCESS] Application files deployed successfully"
 
     - name: Configure IIS Application Pool
       shell: powershell
@@ -218,7 +218,7 @@ jobs:
         Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "recycling.periodicRestart.time" -Value "00:00:00"
         Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "processModel.loadUserProfile" -Value $true
         
-        Write-Host "✅ Application pool configured successfully"
+        Write-Host "[SUCCESS] Application pool configured successfully"
 
     - name: Configure IIS Website
       shell: powershell
@@ -239,7 +239,7 @@ jobs:
           -ApplicationPool ${{ env.IIS_APP_POOL }} `
           -Port 80
           
-        Write-Host "✅ Website configured successfully"
+        Write-Host "[SUCCESS] Website configured successfully"
         Write-Host "Site: ${{ env.IIS_SITE_NAME }}"
         Write-Host "Path: ${{ env.IIS_SITE_PATH }}"
         Write-Host "Pool: ${{ env.IIS_APP_POOL }}"
@@ -265,9 +265,9 @@ jobs:
         } while ($state -ne "Started" -and $elapsed -lt $timeout)
         
         if ($state -eq "Started") {
-          Write-Host "✅ Application pool started successfully"
+          Write-Host "[SUCCESS] Application pool started successfully"
         } else {
-          throw "❌ Application pool failed to start within timeout"
+          throw "[ERROR] Application pool failed to start within timeout"
         }
 
     - name: Health Check
@@ -286,17 +286,17 @@ jobs:
             $response = Invoke-WebRequest -Uri $healthCheckUrl -TimeoutSec 10 -UseBasicParsing
             
             if ($response.StatusCode -eq 200) {
-              Write-Host "✅ Health check passed! Application is responding"
+              Write-Host "[SUCCESS] Health check passed! Application is responding"
               Write-Host "Status Code: $($response.StatusCode)"
               break
             } else {
-              Write-Warning "⚠️ Unexpected status code: $($response.StatusCode)"
+              Write-Warning "[WARNING] Unexpected status code: $($response.StatusCode)"
             }
           } catch {
-            Write-Warning "⚠️ Health check failed: $($_.Exception.Message)"
+            Write-Warning "[WARNING] Health check failed: $($_.Exception.Message)"
             
             if ($i -eq $maxAttempts) {
-              throw "❌ Health check failed after $maxAttempts attempts"
+              throw "[ERROR] Health check failed after $maxAttempts attempts"
             }
             
             Write-Host "Waiting $delay seconds before retry..."
@@ -340,7 +340,7 @@ jobs:
         
         if (Test-Path ${{ env.PUBLISH_PATH }}) {
           Remove-Item -Path ${{ env.PUBLISH_PATH }} -Recurse -Force
-          Write-Host "✅ Cleaned publish directory"
+          Write-Host "[SUCCESS] Cleaned publish directory"
         }
         
-        Write-Host "✅ Cleanup completed" 
+        Write-Host "[SUCCESS] Cleanup completed" 
