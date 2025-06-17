@@ -461,12 +461,22 @@ jobs:
           Write-Warning "Failed to create deployment directory: $($_.Exception.Message)"
         }
         
+        # Get MSDeploy path
+        $msdeployPath = $env:MSDEPLOY_PATH
+        if (!$msdeployPath) {
+          $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          if (!(Test-Path $msdeployPath)) {
+            $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          }
+        }
+        
         # Create Application Pool using Web Deploy
         Write-Host "Creating/Configuring Application Pool: $appPoolName"
         $appPoolCreated = $false
         
-        if ($isAdmin) {
+        if ($isAdmin -and (Test-Path $msdeployPath)) {
           try {
+            Write-Host "Attempting to create application pool with Web Deploy..."
             & "$msdeployPath" `
               -verb:sync `
               -source:appPool `
@@ -497,7 +507,11 @@ jobs:
             }
           }
         } else {
-          Write-Host "[INFO] Skipping application pool creation - requires Administrator privileges"
+          if (!$isAdmin) {
+            Write-Host "[INFO] Skipping application pool creation - requires Administrator privileges"
+          } elseif (!(Test-Path $msdeployPath)) {
+            Write-Host "[INFO] Skipping application pool creation - Web Deploy not found"
+          }
           Write-Host "[INFO] Please create application pool manually in IIS Manager:"
           Write-Host "       Name: $appPoolName"
           Write-Host "       .NET CLR Version: No Managed Code"
@@ -508,8 +522,9 @@ jobs:
         Write-Host "Creating/Configuring IIS Website: $siteName"
         $websiteCreated = $false
         
-        if ($isAdmin -and (Test-Path $sitePath)) {
+        if ($isAdmin -and (Test-Path $sitePath) -and (Test-Path $msdeployPath)) {
           try {
+            Write-Host "Attempting to create website with Web Deploy..."
             & "$msdeployPath" `
               -verb:sync `
               -source:appHostConfig="Default Web Site" `
@@ -539,10 +554,18 @@ jobs:
           if (!$websiteCreated) {
             try {
               Write-Host "[INFO] Attempting fallback with appcmd..."
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"$siteName" /physicalPath:"$sitePath" /bindings:http/*:80: /applicationPool:"$appPoolName"
+              # Create site first without application pool
+              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"$siteName" /physicalPath:"$sitePath" /bindings:http/*:80:
               if ($LASTEXITCODE -eq 0) {
-                Write-Host "[SUCCESS] Website created with appcmd fallback"
-                $websiteCreated = $true
+                Write-Host "[INFO] Website created, now assigning application pool..."
+                # Then assign application pool to the site
+                & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set app "$siteName/" /applicationPool:"$appPoolName"
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "[SUCCESS] Website created and configured with appcmd fallback"
+                  $websiteCreated = $true
+                } else {
+                  Write-Warning "[WARNING] Website created but failed to assign application pool"
+                }
               }
             } catch {
               Write-Warning "[WARNING] Fallback website creation also failed: $($_.Exception.Message)"
@@ -551,8 +574,10 @@ jobs:
         } else {
           if (!$isAdmin) {
             Write-Host "[INFO] Skipping website creation - requires Administrator privileges"
-          } else {
+          } elseif (!(Test-Path $sitePath)) {
             Write-Host "[INFO] Skipping website creation - deployment directory does not exist"
+          } elseif (!(Test-Path $msdeployPath)) {
+            Write-Host "[INFO] Skipping website creation - Web Deploy not found"
           }
           Write-Host "[INFO] Please create website manually in IIS Manager:"
           Write-Host "       Name: $siteName"
