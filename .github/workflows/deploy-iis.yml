@@ -71,11 +71,6 @@ jobs:
       with:
         fetch-depth: 0 # Get full history for better change detection
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
     - name: Display Environment Info
       shell: powershell
       run: |
@@ -95,89 +90,6 @@ jobs:
         Write-Host "Deployment Timeout: ${{ env.DEPLOYMENT_TIMEOUT }}s"
         Write-Host "=============================================" -ForegroundColor Cyan
 
-    - name: Initialize IIS Configuration
-      shell: powershell
-      run: |
-        Write-Host "Initializing IIS Configuration..."
-        
-        # Check if running as Administrator
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        Write-Host "[INFO] Running as Administrator: $isAdmin"
-        
-        if (!$isAdmin) {
-          Write-Host "[WARNING] Not running as Administrator - some IIS operations may fail"
-          Write-Host "[INFO] Please ensure the GitHub Actions runner service is running as Administrator"
-          Write-Host "[INFO] Or run the runner with elevated privileges"
-        }
-        
-        # Ensure IIS is running
-        try {
-          $iisService = Get-Service -Name W3SVC -ErrorAction SilentlyContinue
-          if ($iisService -and $iisService.Status -ne "Running") {
-            Write-Host "Starting IIS service..."
-            if ($isAdmin) {
-              Start-Service -Name W3SVC
-              Write-Host "[SUCCESS] IIS service started"
-            } else {
-              Write-Warning "[WARNING] Cannot start IIS service - insufficient privileges"
-            }
-          } else {
-            Write-Host "[INFO] IIS service is already running"
-          }
-        } catch {
-          Write-Warning "[WARNING] Could not check/start IIS service: $($_.Exception.Message)"
-        }
-        
-        # Skip redirection.config creation if not admin - it's not critical for deployment
-        if ($isAdmin) {
-          Write-Host "Checking redirection.config (Administrator mode)..."
-          $redirectionConfigPath = "$env:SystemRoot\System32\inetsrv\config\redirection.config"
-          try {
-            if (!(Test-Path $redirectionConfigPath -ErrorAction SilentlyContinue)) {
-              Write-Host "Creating redirection.config..."
-              $redirectionConfig = '<?xml version="1.0" encoding="UTF-8"?><configuration><configSections><section name="configurationRedirection" type="System.Configuration.IgnoreSectionHandler" allowDefinition="MachineOnly" restartOnExternalChanges="true" requirePermission="false" /></configSections><configurationRedirection enabled="false" /></configuration>'
-              $redirectionConfig | Out-File -FilePath $redirectionConfigPath -Encoding UTF8 -Force
-              Write-Host "[SUCCESS] Created redirection.config"
-            } else {
-              Write-Host "[INFO] redirection.config already exists"
-            }
-          } catch {
-            Write-Warning "[WARNING] Could not handle redirection.config: $($_.Exception.Message)"
-          }
-        } else {
-          Write-Host "[INFO] Skipping redirection.config creation - requires Administrator privileges"
-        }
-        
-        # Test IIS accessibility using appcmd
-        try {
-          Write-Host "Testing IIS configuration access..."
-          
-          # Try a simple appcmd operation that doesn't require admin rights
-          $testResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list sites 2>&1
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] IIS is accessible via appcmd"
-            Write-Host "[INFO] Found $($testResult.Count) existing sites"
-          } else {
-            Write-Warning "[WARNING] appcmd test failed with exit code: $LASTEXITCODE"
-            Write-Host "[INFO] Output: $testResult"
-            
-            # Common exit codes and their meanings
-            switch ($LASTEXITCODE) {
-              5 { Write-Host "[INFO] Exit code 5 - Configuration/Permission error - expected without admin rights" }
-              183 { Write-Host "[INFO] Exit code 183 - File already exists - not critical" }
-              default { Write-Host "[INFO] Exit code $LASTEXITCODE - Will use alternative deployment methods" }
-            }
-            
-            Write-Host "[INFO] This is expected when running without Administrator privileges"
-            Write-Host "[INFO] Deployment will use PowerShell cmdlets and file operations instead"
-          }
-        } catch {
-          Write-Warning "[WARNING] IIS accessibility test failed: $($_.Exception.Message)"
-          Write-Host "[INFO] Deployment will continue with limited IIS management capabilities"
-        }
-        
-        Write-Host "[SUCCESS] IIS initialization completed"
-
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
@@ -185,117 +97,6 @@ jobs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
-
-    - name: Enhanced Prerequisites Check
-      shell: powershell
-      run: |
-        Write-Host "=== ENHANCED PREREQUISITES CHECK ===" -ForegroundColor Yellow
-        
-        $errors = @()
-        $warnings = @()
-        
-        # Check if running as Administrator
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        if ($isAdmin) {
-          Write-Host "[OK] Running as Administrator" -ForegroundColor Green
-        } else {
-          $warnings += "Not running as Administrator - some operations may fail"
-          Write-Warning "[WARNING] Not running as Administrator"
-        }
-        
-        # Check .NET installation
-        try {
-          $dotnetVersion = dotnet --version
-          Write-Host "[OK] .NET SDK Version: $dotnetVersion" -ForegroundColor Green
-        } catch {
-          $errors += ".NET SDK not found - please install .NET ${{ env.DOTNET_VERSION }} SDK"
-          Write-Error "[ERROR] .NET SDK not found"
-        }
-        
-        # Check IIS installation
-        try {
-          $iisService = Get-Service W3SVC -ErrorAction SilentlyContinue
-          if ($iisService) {
-            Write-Host "[OK] IIS Service Status: $($iisService.Status)" -ForegroundColor Green
-            
-            # Check IIS version
-            $iisVersion = Get-ItemProperty "HKLM:SOFTWARE\Microsoft\InetStp\" -Name "MajorVersion" -ErrorAction SilentlyContinue
-            if ($iisVersion) {
-              Write-Host "[OK] IIS Version: $($iisVersion.MajorVersion)" -ForegroundColor Green
-            }
-          } else {
-            $errors += "IIS service not found - please install IIS"
-            Write-Error "[ERROR] IIS service not found"
-          }
-        } catch {
-          Write-Warning "[WARNING] Could not check IIS service: $($_.Exception.Message)"
-        }
-        
-        # Check ASP.NET Core Module
-        $aspnetCoreModulePath = "$env:SystemRoot\System32\inetsrv\aspnetcorev2.dll"
-        if (Test-Path $aspnetCoreModulePath) {
-          Write-Host "[OK] ASP.NET Core Module V2 installed" -ForegroundColor Green
-        } else {
-          $warnings += "ASP.NET Core Hosting Bundle not installed - may cause 500.19 errors"
-          Write-Warning "[WARNING] ASP.NET Core Module V2 not found"
-        }
-        
-        # Check disk space (minimum 1GB free)
-        try {
-          $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
-          if ($freeSpaceGB -gt 1) {
-            Write-Host "[OK] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
-          } else {
-            $warnings += "Low disk space (${freeSpaceGB}GB available, minimum 1GB recommended)"
-            Write-Warning "[WARNING] Low disk space: ${freeSpaceGB}GB"
-          }
-        } catch {
-          Write-Warning "[WARNING] Could not check disk space: $($_.Exception.Message)"
-        }
-        
-        # Check PowerShell execution policy
-        try {
-          $executionPolicy = Get-ExecutionPolicy
-          Write-Host "[INFO] PowerShell Execution Policy: $executionPolicy" -ForegroundColor Cyan
-        } catch {
-          Write-Warning "[WARNING] Could not check execution policy"
-        }
-        
-        # Summary
-        if ($errors.Count -eq 0) {
-          Write-Host "[SUCCESS] All critical prerequisites met" -ForegroundColor Green
-          if ($warnings.Count -gt 0) {
-            Write-Host "[INFO] $($warnings.Count) warning(s) detected:" -ForegroundColor Yellow
-            foreach ($warning in $warnings) {
-              Write-Host "  - $warning" -ForegroundColor Yellow
-            }
-          }
-        } else {
-          Write-Host "[ERROR] Prerequisites validation failed:" -ForegroundColor Red
-          foreach ($error in $errors) {
-            Write-Host "  - $error" -ForegroundColor Red
-          }
-          throw "Prerequisites not met"
-        }
-        
-        # Show privilege notice if needed
-        if (!$isAdmin) {
-          Write-Host ""
-          Write-Host "============================================" -ForegroundColor Yellow
-          Write-Host "NOTICE: LIMITED PRIVILEGES MODE" -ForegroundColor Yellow
-          Write-Host "============================================" -ForegroundColor Yellow
-          Write-Host ""
-          Write-Host "Running without Administrator privileges." -ForegroundColor Yellow
-          Write-Host "Some IIS management features will be limited." -ForegroundColor Yellow
-          Write-Host ""
-          Write-Host "For full functionality:" -ForegroundColor Cyan
-          Write-Host "1. Run GitHub Actions runner as Administrator" -ForegroundColor White
-          Write-Host "2. Or use manual deployment scripts" -ForegroundColor White
-          Write-Host ""
-          Write-Host "Deployment will continue with available functionality..." -ForegroundColor Green
-          Write-Host "============================================" -ForegroundColor Yellow
-        }
 
     - name: Restore dependencies
       shell: powershell
@@ -335,7 +136,7 @@ jobs:
             
             if ($LASTEXITCODE -eq 0) {
               Write-Host "[SUCCESS] All tests passed" -ForegroundColor Green
-            } else {
+        } else {
               Write-Error "Tests failed with exit code: $LASTEXITCODE"
               if ("${{ inputs.force_deploy }}" -ne "true") {
                 throw "Tests failed - deployment aborted"
@@ -366,18 +167,18 @@ jobs:
         
         try {
           # Publish application
-          dotnet publish ${{ env.PROJECT_PATH }} `
-            --configuration Release `
-            --no-build `
-            --output ${{ env.PUBLISH_PATH }} `
-            --self-contained false `
+        dotnet publish ${{ env.PROJECT_PATH }} `
+          --configuration Release `
+          --no-build `
+          --output ${{ env.PUBLISH_PATH }} `
+          --self-contained false `
             --verbosity minimal `
             --property:PublishUrl=${{ env.IIS_SITE_PATH }}
-            
-          if ($LASTEXITCODE -ne 0) {
-            throw "Publish failed with exit code: $LASTEXITCODE"
-          }
           
+        if ($LASTEXITCODE -ne 0) {
+            throw "Publish failed with exit code: $LASTEXITCODE"
+        }
+        
           # Verify publish output
           if (Test-Path ${{ env.PUBLISH_PATH }}) {
             $publishedFiles = Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse -File
@@ -745,31 +546,31 @@ jobs:
             # Stop services for direct deployment
             Write-Host "Stopping IIS services for direct deployment..."
             try {
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool "${{ env.IIS_APP_POOL }}" 2>&1 | Out-Null
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop site "${{ env.IIS_SITE_NAME }}" 2>&1 | Out-Null
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool "${{ env.IIS_APP_POOL }}" 2>&1 | Out-Null
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop site "${{ env.IIS_SITE_NAME }}" 2>&1 | Out-Null
               Write-Host "[SUCCESS] Services stopped" -ForegroundColor Green
-            } catch {
-              Write-Warning "[WARNING] Could not stop services with appcmd: $($_.Exception.Message)"
-              try {
-                Import-Module WebAdministration -Force
-                Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-                Stop-Website -Name "${{ env.IIS_SITE_NAME }}" -ErrorAction SilentlyContinue
+        } catch {
+          Write-Warning "[WARNING] Could not stop services with appcmd: $($_.Exception.Message)"
+          try {
+            Import-Module WebAdministration -Force
+            Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
+            Stop-Website -Name "${{ env.IIS_SITE_NAME }}" -ErrorAction SilentlyContinue
                 Write-Host "[SUCCESS] Services stopped with PowerShell" -ForegroundColor Green
-              } catch {
+          } catch {
                 Write-Warning "[WARNING] Could not stop services: $($_.Exception.Message)"
-              }
-            }
-            
-            Start-Sleep -Seconds 3
-            
+          }
+        }
+        
+        Start-Sleep -Seconds 3
+        
             # Direct file replacement
             Write-Host "Performing direct file replacement..."
-            try {
-              # Remove old files (except logs and data directories)
+        try {
+          # Remove old files (except logs and data directories)
               Get-ChildItem -Path $targetPath -Exclude "logs", "App_Data", "uploads", "*.log" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-              
-              # Copy new files
-              Copy-Item -Path "$sourcePath\*" -Destination $targetPath -Recurse -Force
+          
+          # Copy new files
+          Copy-Item -Path "$sourcePath\*" -Destination $targetPath -Recurse -Force
               Write-Host "[SUCCESS] Files deployed directly" -ForegroundColor Green
             } catch {
               Write-Error "Direct deployment failed: $($_.Exception.Message)"
@@ -830,13 +631,13 @@ jobs:
               # Remove app_offline.htm to bring application back online
               Remove-Item -Path "$targetPath\app_offline.htm" -Force -ErrorAction SilentlyContinue
               Write-Host "[SUCCESS] Rolling deployment completed" -ForegroundColor Green
-              
-            } catch {
+          
+        } catch {
               # Ensure app_offline.htm is removed even if deployment fails
               Remove-Item -Path "$targetPath\app_offline.htm" -Force -ErrorAction SilentlyContinue
               Write-Error "Rolling deployment failed: $($_.Exception.Message)"
-              throw
-            }
+          throw
+        }
           }
         }
         
@@ -949,14 +750,14 @@ jobs:
         foreach ($url in $healthCheckUrls) {
           Write-Host ""
           Write-Host "Testing URL: $url" -ForegroundColor Magenta
-          
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-            try {
+        
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+          try {
               Write-Host "  Attempt $i/$maxAttempts..." -ForegroundColor Gray
-              
+            
               $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
-              
-              if ($response.StatusCode -eq 200) {
+            
+            if ($response.StatusCode -eq 200) {
                 $duration = (Get-Date) - $startTime
                 Write-Host "[SUCCESS] Application is healthy!" -ForegroundColor Green
                 Write-Host "  URL: $url" -ForegroundColor Cyan
@@ -972,17 +773,17 @@ jobs:
                 }
                 
                 $healthCheckPassed = $true
-                break
-              } else {
+              break
+            } else {
                 Write-Warning "  Unexpected status code: $($response.StatusCode)"
                 if ($response.Content) {
                   Write-Host "  Response preview: $($response.Content.Substring(0, [Math]::Min(200, $response.Content.Length)))" -ForegroundColor Gray
                 }
-              }
-              
-            } catch {
+            }
+            
+          } catch {
               Write-Warning "  Health check failed: $($_.Exception.Message)"
-              
+            
               if ($i -lt $maxAttempts) {
                 Write-Host "  Waiting ${delaySeconds}s before retry..." -ForegroundColor Gray
                 Start-Sleep -Seconds $delaySeconds
@@ -996,24 +797,24 @@ jobs:
         if (!$healthCheckPassed) {
           Write-Host ""
           Write-Host "=== HEALTH CHECK FAILED - TROUBLESHOOTING ===" -ForegroundColor Red
-          
+              
           # Check IIS services status
           Write-Host ""
           Write-Host "IIS Services Status:" -ForegroundColor Yellow
-          try {
-            $appPoolStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool "${{ env.IIS_APP_POOL }}" 2>&1
+              try {
+                $appPoolStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool "${{ env.IIS_APP_POOL }}" 2>&1
             Write-Host "  App Pool: $appPoolStatus" -ForegroundColor Cyan
           } catch {
             Write-Warning "  Could not check app pool status: $($_.Exception.Message)"
           }
           
-          try {
-            $siteStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list site "${{ env.IIS_SITE_NAME }}" 2>&1
+              try {
+                $siteStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list site "${{ env.IIS_SITE_NAME }}" 2>&1
             Write-Host "  Website: $siteStatus" -ForegroundColor Cyan
           } catch {
             Write-Warning "  Could not check website status: $($_.Exception.Message)"
           }
-          
+              
           # Check if files exist
           Write-Host ""
           Write-Host "Deployment Files Check:" -ForegroundColor Yellow
