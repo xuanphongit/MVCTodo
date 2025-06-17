@@ -1,13 +1,6 @@
 name: Deploy to IIS using Web Deploy
 
 on:
-  push:
-    branches: [ "master", "main" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/**'
-      - '!.github/workflows/**'
   workflow_dispatch:
     inputs:
       environment:
