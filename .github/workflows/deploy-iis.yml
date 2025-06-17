@@ -67,13 +67,23 @@ jobs:
         $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
         Write-Host "[INFO] Running as Administrator: $isAdmin"
         
+        if (!$isAdmin) {
+          Write-Host "[WARNING] Not running as Administrator - some IIS operations may fail"
+          Write-Host "[INFO] Please ensure the GitHub Actions runner service is running as Administrator"
+          Write-Host "[INFO] Or run the runner with elevated privileges"
+        }
+        
         # Ensure IIS is running
         try {
           $iisService = Get-Service -Name W3SVC -ErrorAction SilentlyContinue
           if ($iisService -and $iisService.Status -ne "Running") {
             Write-Host "Starting IIS service..."
-            Start-Service -Name W3SVC
-            Write-Host "[SUCCESS] IIS service started"
+            if ($isAdmin) {
+              Start-Service -Name W3SVC
+              Write-Host "[SUCCESS] IIS service started"
+            } else {
+              Write-Warning "[WARNING] Cannot start IIS service - insufficient privileges"
+            }
           } else {
             Write-Host "[INFO] IIS service is already running"
           }
@@ -81,73 +91,103 @@ jobs:
           Write-Warning "[WARNING] Could not check/start IIS service: $($_.Exception.Message)"
         }
         
-        # Handle redirection.config with proper permission handling
-        $redirectionConfigPath = "$env:SystemRoot\System32\inetsrv\config\redirection.config"
-        try {
-          # Try to check if file exists with error handling
-          $fileExists = $false
+        # Skip redirection.config creation if not admin - it's not critical for deployment
+        if ($isAdmin) {
+          Write-Host "Checking redirection.config (Administrator mode)..."
+          $redirectionConfigPath = "$env:SystemRoot\System32\inetsrv\config\redirection.config"
           try {
-            $fileExists = Test-Path $redirectionConfigPath -ErrorAction Stop
-            Write-Host "[INFO] Successfully checked redirection.config existence: $fileExists"
-          } catch [System.UnauthorizedAccessException] {
-            Write-Warning "[WARNING] Access denied checking redirection.config - assuming it needs to be created"
-            $fileExists = $false
-          } catch {
-            Write-Warning "[WARNING] Could not check redirection.config: $($_.Exception.Message)"
-            $fileExists = $false
-          }
-          
-          if (!$fileExists) {
-            Write-Host "Attempting to create redirection.config..."
-            try {
-              # Try to create the directory first if it doesn't exist
-              $configDir = Split-Path $redirectionConfigPath -Parent
-              if (!(Test-Path $configDir -ErrorAction SilentlyContinue)) {
-                New-Item -ItemType Directory -Path $configDir -Force -ErrorAction SilentlyContinue | Out-Null
-                Write-Host "[INFO] Created config directory"
-              }
-              
-              # Create the redirection.config file
+            if (!(Test-Path $redirectionConfigPath -ErrorAction SilentlyContinue)) {
+              Write-Host "Creating redirection.config..."
               $redirectionConfig = '<?xml version="1.0" encoding="UTF-8"?><configuration><configSections><section name="configurationRedirection" type="System.Configuration.IgnoreSectionHandler" allowDefinition="MachineOnly" restartOnExternalChanges="true" requirePermission="false" /></configSections><configurationRedirection enabled="false" /></configuration>'
-              
-              # Try multiple methods to create the file
-              try {
-                $redirectionConfig | Out-File -FilePath $redirectionConfigPath -Encoding UTF8 -Force -ErrorAction Stop
-                Write-Host "[SUCCESS] Created redirection.config using Out-File"
-              } catch {
-                # Alternative method using .NET
-                [System.IO.File]::WriteAllText($redirectionConfigPath, $redirectionConfig, [System.Text.Encoding]::UTF8)
-                Write-Host "[SUCCESS] Created redirection.config using .NET File.WriteAllText"
-              }
-            } catch {
-              Write-Warning "[WARNING] Could not create redirection.config: $($_.Exception.Message)"
-              Write-Host "[INFO] This may not prevent deployment from continuing..."
+              $redirectionConfig | Out-File -FilePath $redirectionConfigPath -Encoding UTF8 -Force
+              Write-Host "[SUCCESS] Created redirection.config"
+            } else {
+              Write-Host "[INFO] redirection.config already exists"
             }
-          } else {
-            Write-Host "[INFO] redirection.config already exists"
+          } catch {
+            Write-Warning "[WARNING] Could not handle redirection.config: $($_.Exception.Message)"
           }
-        } catch {
-          Write-Warning "[WARNING] Error handling redirection.config: $($_.Exception.Message)"
-          Write-Host "[INFO] Continuing with deployment..."
+        } else {
+          Write-Host "[INFO] Skipping redirection.config creation - requires Administrator privileges"
         }
         
-        # Initialize IIS using appcmd (usually has better permissions)
+        # Test IIS accessibility using appcmd
         try {
-          Write-Host "Initializing IIS using appcmd..."
+          Write-Host "Testing IIS configuration access..."
           
-          # List current configuration to verify IIS is accessible
-          $appcmdResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list config -section:system.webServer/globalModules 2>&1
+          # Try a simple appcmd operation that doesn't require admin rights
+          $testResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list sites 2>&1
           if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] IIS configuration is accessible via appcmd"
+            Write-Host "[SUCCESS] IIS is accessible via appcmd"
+            Write-Host "[INFO] Found $($testResult.Count) existing sites"
           } else {
-            Write-Warning "[WARNING] IIS configuration may have issues, but continuing..."
+            Write-Warning "[WARNING] appcmd test failed with exit code: $LASTEXITCODE"
+            Write-Host "[INFO] Output: $testResult"
+            
+            # If appcmd fails, we might still be able to deploy
+            Write-Host "[INFO] Will attempt deployment using alternative methods..."
           }
         } catch {
-          Write-Warning "[WARNING] IIS initialization check failed: $($_.Exception.Message)"
-          Write-Host "[INFO] Continuing with deployment..."
+          Write-Warning "[WARNING] IIS accessibility test failed: $($_.Exception.Message)"
+          Write-Host "[INFO] Deployment will continue with limited IIS management capabilities"
         }
         
         Write-Host "[SUCCESS] IIS initialization completed"
+
+    - name: Check Prerequisites
+      shell: powershell
+      run: |
+        Write-Host "=== CHECKING DEPLOYMENT PREREQUISITES ==="
+        
+        # Check .NET installation
+        try {
+          $dotnetVersion = dotnet --version
+          Write-Host "[SUCCESS] .NET SDK Version: $dotnetVersion"
+        } catch {
+          Write-Error "[ERROR] .NET SDK not found. Please install .NET 8.0 SDK on the runner machine"
+          throw "Missing .NET SDK"
+        }
+        
+        # Check IIS installation
+        try {
+          $iisVersion = Get-ItemProperty "HKLM:SOFTWARE\Microsoft\InetStp\" -Name "MajorVersion" -ErrorAction SilentlyContinue
+          if ($iisVersion) {
+            Write-Host "[SUCCESS] IIS Version: $($iisVersion.MajorVersion)"
+          } else {
+            Write-Warning "[WARNING] Could not determine IIS version"
+          }
+        } catch {
+          Write-Warning "[WARNING] IIS version check failed: $($_.Exception.Message)"
+        }
+        
+        # Check admin privileges
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+        if (!$isAdmin) {
+          Write-Host ""
+          Write-Host "============================================"
+          Write-Host "⚠️  IMPORTANT: ADMINISTRATOR PRIVILEGES REQUIRED"
+          Write-Host "============================================"
+          Write-Host ""
+          Write-Host "To fix this issue, please:"
+          Write-Host "1. Stop the GitHub Actions runner service:"
+          Write-Host "   Stop-Service -Name 'actions.runner.*'"
+          Write-Host ""
+          Write-Host "2. Run PowerShell as Administrator and restart the runner:"
+          Write-Host "   cd C:\actions-runner"
+          Write-Host "   .\run.cmd"
+          Write-Host ""
+          Write-Host "3. Or install runner as service with admin privileges:"
+          Write-Host "   .\svc.sh install"
+          Write-Host "   .\svc.sh start"
+          Write-Host ""
+          Write-Host "4. Alternatively, run this deployment manually with admin PowerShell"
+          Write-Host ""
+          Write-Host "============================================"
+          Write-Host ""
+          Write-Host "[INFO] Deployment will continue with limited functionality..."
+        } else {
+          Write-Host "[SUCCESS] Running with Administrator privileges"
+        }
 
     - name: Restore dependencies
       shell: powershell
@@ -215,6 +255,16 @@ jobs:
       run: |
         Write-Host "=== IIS WEB APP MANAGE TASK ==="
         Write-Host "Creating or updating IIS website and application pool..."
+        
+        # Check admin privileges again
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+        Write-Host "[INFO] Running as Administrator: $isAdmin"
+        
+        if (!$isAdmin) {
+          Write-Host "[WARNING] IIS management requires Administrator privileges"
+          Write-Host "[INFO] Some operations may fail or be skipped"
+          Write-Host "[INFO] Please run GitHub Actions runner as Administrator for full functionality"
+        }
         
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $appPoolName = "${{ env.IIS_APP_POOL }}"
