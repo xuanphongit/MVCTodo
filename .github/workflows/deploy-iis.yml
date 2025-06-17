@@ -1,0 +1,351 @@
+name: Deploy to IIS
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      force_deploy:
+        description: 'Force deployment (skip health checks)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_PATH: './Todo.csproj'
+  PUBLISH_PATH: './publish'
+  IIS_SITE_NAME: 'TodoMVCApp'
+  IIS_APP_POOL: 'TodoMVCAppPool'
+  IIS_SITE_PATH: 'C:\inetpub\wwwroot\TodoApp'
+  BACKUP_PATH: 'C:\Deployments\Backups'
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy to IIS
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Display Environment Info
+      shell: powershell
+      run: |
+        Write-Host "=== Deployment Environment Information ==="
+        Write-Host "Runner OS: $env:RUNNER_OS"
+        Write-Host "Workflow: ${{ github.workflow }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Environment: ${{ inputs.environment || 'production' }}"
+        Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "============================================="
+
+    - name: Restore dependencies
+      shell: powershell
+      run: |
+        Write-Host "Restoring NuGet packages..."
+        dotnet restore ${{ env.PROJECT_PATH }}
+        if ($LASTEXITCODE -ne 0) {
+          throw "Package restore failed"
+        }
+        Write-Host "✅ Package restore completed successfully"
+
+    - name: Build application
+      shell: powershell
+      run: |
+        Write-Host "Building application in Release mode..."
+        dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+        if ($LASTEXITCODE -ne 0) {
+          throw "Build failed"
+        }
+        Write-Host "✅ Build completed successfully"
+
+    - name: Run tests (if available)
+      shell: powershell
+      continue-on-error: true
+      run: |
+        Write-Host "Running tests..."
+        $testProjects = Get-ChildItem -Recurse -Filter "*Test*.csproj" -File
+        if ($testProjects.Count -gt 0) {
+          dotnet test --configuration Release --no-build --verbosity normal
+          Write-Host "✅ Tests completed"
+        } else {
+          Write-Host "ℹ️ No test projects found, skipping tests"
+        }
+
+    - name: Publish application
+      shell: powershell
+      run: |
+        Write-Host "Publishing application..."
+        if (Test-Path ${{ env.PUBLISH_PATH }}) {
+          Remove-Item -Path ${{ env.PUBLISH_PATH }} -Recurse -Force
+          Write-Host "Cleaned existing publish directory"
+        }
+        
+        dotnet publish ${{ env.PROJECT_PATH }} `
+          --configuration Release `
+          --no-build `
+          --output ${{ env.PUBLISH_PATH }} `
+          --self-contained false `
+          --verbosity normal
+          
+        if ($LASTEXITCODE -ne 0) {
+          throw "Publish failed"
+        }
+        
+        Write-Host "✅ Application published successfully"
+        Write-Host "Published files:"
+        Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+
+    - name: Create backup of current deployment
+      shell: powershell
+      run: |
+        Write-Host "Creating backup of current deployment..."
+        
+        $backupDir = "${{ env.BACKUP_PATH }}\$(Get-Date -Format 'yyyyMMdd-HHmmss')-${{ github.sha }}"
+        
+        if (!(Test-Path ${{ env.BACKUP_PATH }})) {
+          New-Item -ItemType Directory -Path ${{ env.BACKUP_PATH }} -Force | Out-Null
+          Write-Host "Created backup directory: ${{ env.BACKUP_PATH }}"
+        }
+        
+        if (Test-Path ${{ env.IIS_SITE_PATH }}) {
+          Write-Host "Backing up current deployment to: $backupDir"
+          New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+          Copy-Item -Path "${{ env.IIS_SITE_PATH }}\*" -Destination $backupDir -Recurse -Force
+          Write-Host "✅ Backup created successfully"
+          
+          # Keep only last 5 backups
+          $oldBackups = Get-ChildItem -Path ${{ env.BACKUP_PATH }} -Directory | Sort-Object CreationTime -Descending | Select-Object -Skip 5
+          if ($oldBackups) {
+            Write-Host "Cleaning up old backups..."
+            $oldBackups | Remove-Item -Recurse -Force
+            Write-Host "Removed $($oldBackups.Count) old backup(s)"
+          }
+        } else {
+          Write-Host "ℹ️ No existing deployment found, skipping backup"
+        }
+
+    - name: Stop IIS Application Pool
+      shell: powershell
+      run: |
+        Write-Host "Managing IIS Application Pool: ${{ env.IIS_APP_POOL }}"
+        
+        Import-Module WebAdministration -ErrorAction SilentlyContinue
+        
+        # Check if application pool exists
+        $appPool = Get-IISAppPool -Name ${{ env.IIS_APP_POOL }} -ErrorAction SilentlyContinue
+        
+        if ($appPool) {
+          Write-Host "Stopping application pool..."
+          Stop-WebAppPool -Name ${{ env.IIS_APP_POOL }} -ErrorAction SilentlyContinue
+          
+          # Wait for app pool to stop
+          $timeout = 30
+          $elapsed = 0
+          do {
+            Start-Sleep -Seconds 2
+            $elapsed += 2
+            $state = (Get-IISAppPool -Name ${{ env.IIS_APP_POOL }}).State
+            Write-Host "App pool state: $state (waiting $elapsed/$timeout seconds)"
+          } while ($state -ne "Stopped" -and $elapsed -lt $timeout)
+          
+          if ($state -eq "Stopped") {
+            Write-Host "✅ Application pool stopped successfully"
+          } else {
+            Write-Warning "⚠️ Application pool did not stop within timeout, continuing anyway"
+          }
+        } else {
+          Write-Host "ℹ️ Application pool does not exist, will be created during deployment"
+        }
+
+    - name: Deploy to IIS
+      shell: powershell
+      run: |
+        Write-Host "Deploying application to IIS..."
+        
+        # Ensure target directory exists
+        if (!(Test-Path ${{ env.IIS_SITE_PATH }})) {
+          New-Item -ItemType Directory -Path ${{ env.IIS_SITE_PATH }} -Force | Out-Null
+          Write-Host "Created IIS site directory: ${{ env.IIS_SITE_PATH }}"
+        }
+        
+        # Copy published files
+        Write-Host "Copying application files..."
+        Copy-Item -Path "${{ env.PUBLISH_PATH }}\*" -Destination ${{ env.IIS_SITE_PATH }} -Recurse -Force
+        
+        # Set appropriate permissions
+        Write-Host "Setting directory permissions..."
+        $acl = Get-Acl ${{ env.IIS_SITE_PATH }}
+        $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("IIS_IUSRS", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.SetAccessRule($accessRule)
+        $accessRule2 = New-Object System.Security.AccessControl.FileSystemAccessRule("IUSR", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.SetAccessRule($accessRule2)
+        Set-Acl -Path ${{ env.IIS_SITE_PATH }} -AclObject $acl
+        
+        Write-Host "✅ Application files deployed successfully"
+
+    - name: Configure IIS Application Pool
+      shell: powershell
+      run: |
+        Write-Host "Configuring IIS Application Pool..."
+        
+        Import-Module WebAdministration
+        
+        # Create or update application pool
+        if (!(Get-IISAppPool -Name ${{ env.IIS_APP_POOL }} -ErrorAction SilentlyContinue)) {
+          New-WebAppPool -Name ${{ env.IIS_APP_POOL }} -Force
+          Write-Host "Created new application pool: ${{ env.IIS_APP_POOL }}"
+        }
+        
+        # Configure application pool settings
+        Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "managedRuntimeVersion" -Value ""
+        Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "startMode" -Value "AlwaysRunning"
+        Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "processModel.idleTimeout" -Value "00:00:00"
+        Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "recycling.periodicRestart.time" -Value "00:00:00"
+        Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "processModel.loadUserProfile" -Value $true
+        
+        Write-Host "✅ Application pool configured successfully"
+
+    - name: Configure IIS Website
+      shell: powershell
+      run: |
+        Write-Host "Configuring IIS Website..."
+        
+        Import-Module WebAdministration
+        
+        # Remove existing site if it exists
+        if (Get-Website -Name ${{ env.IIS_SITE_NAME }} -ErrorAction SilentlyContinue) {
+          Remove-Website -Name ${{ env.IIS_SITE_NAME }}
+          Write-Host "Removed existing website: ${{ env.IIS_SITE_NAME }}"
+        }
+        
+        # Create new website
+        New-Website -Name ${{ env.IIS_SITE_NAME }} `
+          -PhysicalPath ${{ env.IIS_SITE_PATH }} `
+          -ApplicationPool ${{ env.IIS_APP_POOL }} `
+          -Port 80
+          
+        Write-Host "✅ Website configured successfully"
+        Write-Host "Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "Pool: ${{ env.IIS_APP_POOL }}"
+        Write-Host "Port: 80"
+
+    - name: Start IIS Application Pool
+      shell: powershell
+      run: |
+        Write-Host "Starting IIS Application Pool..."
+        
+        Import-Module WebAdministration
+        
+        Start-WebAppPool -Name ${{ env.IIS_APP_POOL }}
+        
+        # Wait for app pool to start
+        $timeout = 30
+        $elapsed = 0
+        do {
+          Start-Sleep -Seconds 2
+          $elapsed += 2
+          $state = (Get-IISAppPool -Name ${{ env.IIS_APP_POOL }}).State
+          Write-Host "App pool state: $state (waiting $elapsed/$timeout seconds)"
+        } while ($state -ne "Started" -and $elapsed -lt $timeout)
+        
+        if ($state -eq "Started") {
+          Write-Host "✅ Application pool started successfully"
+        } else {
+          throw "❌ Application pool failed to start within timeout"
+        }
+
+    - name: Health Check
+      shell: powershell
+      if: ${{ !inputs.force_deploy }}
+      run: |
+        Write-Host "Performing health check..."
+        
+        $maxAttempts = 10
+        $delay = 5
+        $healthCheckUrl = "http://localhost"
+        
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+          try {
+            Write-Host "Health check attempt $i/$maxAttempts..."
+            $response = Invoke-WebRequest -Uri $healthCheckUrl -TimeoutSec 10 -UseBasicParsing
+            
+            if ($response.StatusCode -eq 200) {
+              Write-Host "✅ Health check passed! Application is responding"
+              Write-Host "Status Code: $($response.StatusCode)"
+              break
+            } else {
+              Write-Warning "⚠️ Unexpected status code: $($response.StatusCode)"
+            }
+          } catch {
+            Write-Warning "⚠️ Health check failed: $($_.Exception.Message)"
+            
+            if ($i -eq $maxAttempts) {
+              throw "❌ Health check failed after $maxAttempts attempts"
+            }
+            
+            Write-Host "Waiting $delay seconds before retry..."
+            Start-Sleep -Seconds $delay
+          }
+        }
+
+    - name: Deployment Summary
+      shell: powershell
+      if: always()
+      run: |
+        Write-Host ""
+        Write-Host "=== DEPLOYMENT SUMMARY ==="
+        Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Environment: ${{ inputs.environment || 'production' }}"
+        Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "App Pool: ${{ env.IIS_APP_POOL }}"
+        
+        try {
+          Import-Module WebAdministration -ErrorAction SilentlyContinue
+          $appPoolState = (Get-IISAppPool -Name ${{ env.IIS_APP_POOL }} -ErrorAction SilentlyContinue).State
+          $websiteState = (Get-Website -Name ${{ env.IIS_SITE_NAME }} -ErrorAction SilentlyContinue).State
+          
+          Write-Host "App Pool Status: $appPoolState"
+          Write-Host "Website Status: $websiteState"
+        } catch {
+          Write-Host "Could not retrieve IIS status"
+        }
+        
+        Write-Host "Access URL: http://localhost"
+        Write-Host "=========================="
+
+    - name: Cleanup
+      shell: powershell
+      if: always()
+      run: |
+        Write-Host "Cleaning up temporary files..."
+        
+        if (Test-Path ${{ env.PUBLISH_PATH }}) {
+          Remove-Item -Path ${{ env.PUBLISH_PATH }} -Recurse -Force
+          Write-Host "✅ Cleaned publish directory"
+        }
+        
+        Write-Host "✅ Cleanup completed" 

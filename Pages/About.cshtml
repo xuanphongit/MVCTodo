@@ -1,0 +1,57 @@
+@page
+@model Todo.Pages.AboutModel
+@{
+    ViewData["Title"] = "About";
+    Layout = "~/Pages/Shared/_Layout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/about.css" asp-append-version="true" />
+}
+
+<div class="about-page">
+    <div class="about-container">
+        <div class="about-hero">
+            <div class="about-icon">📋</div>
+            <h1 class="about-title">Todo MVC Application</h1>
+            <p class="about-subtitle">A modern, secure, and efficient task management solution built with ASP.NET Core MVC</p>
+        </div>
+
+        <div class="about-content">
+            <div class="about-card">
+                <div class="card-icon">⚡</div>
+                <h3>Fast & Efficient</h3>
+                <p>Built with cutting-edge ASP.NET Core technology for lightning-fast performance and seamless user experience.</p>
+            </div>
+
+            <div class="about-card">
+                <div class="card-icon">🎨</div>
+                <h3>Beautiful Design</h3>
+                <p>Clean, modern interface designed with user experience in mind. Intuitive navigation makes task management effortless.</p>
+            </div>
+
+            <div class="about-card">
+                <div class="card-icon">🔒</div>
+                <h3>Secure & Reliable</h3>
+                <p>Your tasks are protected with modern security practices and reliable data storage to ensure your productivity never stops.</p>
+            </div>
+
+            <div class="about-card">
+                <div class="card-icon">📱</div>
+                <h3>Mobile Ready</h3>
+                <p>Fully responsive design that works perfectly on all devices, so you can manage your tasks anywhere, anytime.</p>
+            </div>
+        </div>
+
+        <div class="about-footer">
+            <div class="version-info">
+                <h4>Version 1.0.0</h4>
+                <p>Made with ❤️ for productivity enthusiasts</p>
+            </div>
+            <div class="about-actions">
+                <a asp-page="/Index" class="btn-primary">Start Managing Tasks</a>
+                <a asp-page="/Privacy" class="btn-secondary">Privacy Policy</a>
+            </div>
+        </div>
+    </div>
+</div> 
