@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_iis_setup:
+        description: 'Skip IIS website setup (only deploy files)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   DOTNET_VERSION: '8.0.x'
@@ -56,6 +61,7 @@ jobs:
         Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
         Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
         Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "Skip IIS Setup: ${{ inputs.skip_iis_setup || 'false' }}"
         Write-Host "============================================="
 
     - name: Initialize IIS Configuration
@@ -206,10 +212,185 @@ jobs:
         Write-Host "Published files:"
         Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 
+    # ================================
+    # IIS WEB APP MANAGE TASK (Azure DevOps equivalent)
+    # ================================
+    - name: IIS Web App Manage - Create or Update Website
+      if: ${{ inputs.skip_iis_setup != 'true' }}
+      shell: powershell
+      run: |
+        Write-Host "=== IIS WEB APP MANAGE TASK ==="
+        Write-Host "Creating or updating IIS website and application pool..."
+        
+        $siteName = "${{ env.IIS_SITE_NAME }}"
+        $appPoolName = "${{ env.IIS_APP_POOL }}"
+        $sitePath = "${{ env.IIS_SITE_PATH }}"
+        $port = 80
+        
+        # Create deployment directory if it doesn't exist
+        if (!(Test-Path $sitePath)) {
+          New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
+          Write-Host "[SUCCESS] Created deployment directory: $sitePath"
+        }
+        
+        # === APPLICATION POOL MANAGEMENT ===
+        Write-Host "Managing Application Pool: $appPoolName"
+        
+        # Method 1: Try using appcmd.exe (more reliable)
+        try {
+          Write-Host "Checking application pool using appcmd..."
+          $appPoolExists = $false
+          
+          # Check if app pool exists
+          $checkResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool $appPoolName 2>&1
+          if ($LASTEXITCODE -eq 0 -and $checkResult -match $appPoolName) {
+            $appPoolExists = $true
+            Write-Host "[INFO] Application pool '$appPoolName' exists"
+            
+            # Stop the application pool
+            Write-Host "Stopping application pool..."
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool $appPoolName 2>&1 | Out-Null
+            Start-Sleep -Seconds 2
+          } else {
+            Write-Host "[INFO] Application pool '$appPoolName' does not exist"
+          }
+          
+          if (!$appPoolExists) {
+            # Create new application pool
+            Write-Host "Creating application pool: $appPoolName"
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:$appPoolName /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Application pool created successfully"
+            } else {
+              throw "Failed to create application pool"
+            }
+          }
+          
+          # Configure application pool settings
+          Write-Host "Configuring application pool settings..."
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /managedRuntimeVersion:""
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /processModel.identityType:ApplicationPoolIdentity
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /processModel.loadUserProfile:true
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool $appPoolName /recycling.periodicRestart.time:00:00:00
+          
+          Write-Host "[SUCCESS] Application pool configured with appcmd"
+          
+        } catch {
+          Write-Warning "[WARNING] appcmd method failed: $($_.Exception.Message)"
+          
+          # Method 2: Fallback to PowerShell WebAdministration
+          try {
+            Write-Host "Trying PowerShell WebAdministration module..."
+            Import-Module WebAdministration -Force
+            
+            if (!(Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue)) {
+              New-WebAppPool -Name $appPoolName -Force
+              Write-Host "[SUCCESS] Application pool created with PowerShell"
+            }
+            
+            # Configure app pool
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.identityType -Value ApplicationPoolIdentity
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value ""
+            
+            # Stop app pool
+            Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+            
+            Write-Host "[SUCCESS] Application pool managed with PowerShell"
+          } catch {
+            Write-Error "Both appcmd and PowerShell methods failed for application pool management: $($_.Exception.Message)"
+            throw
+          }
+        }
+        
+        # === WEBSITE MANAGEMENT ===
+        Write-Host "Managing IIS Website: $siteName"
+        
+        # Method 1: Try using appcmd.exe
+        try {
+          Write-Host "Checking website using appcmd..."
+          $siteExists = $false
+          
+          # Check if website exists
+          $checkResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list site $siteName 2>&1
+          if ($LASTEXITCODE -eq 0 -and $checkResult -match $siteName) {
+            $siteExists = $true
+            Write-Host "[INFO] Website '$siteName' exists"
+            
+            # Stop the website
+            Write-Host "Stopping website..."
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop site $siteName 2>&1 | Out-Null
+          } else {
+            Write-Host "[INFO] Website '$siteName' does not exist"
+          }
+          
+          if (!$siteExists) {
+            # Create new website
+            Write-Host "Creating website: $siteName"
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:$siteName /bindings:http/*:${port}: /physicalPath:$sitePath
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Website created successfully"
+            } else {
+              throw "Failed to create website"
+            }
+          } else {
+            # Update existing website
+            Write-Host "Updating website configuration..."
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site $siteName /[path='/'].physicalPath:$sitePath
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site $siteName /bindings:http/*:${port}:
+          }
+          
+          # Set application pool for website
+          Write-Host "Assigning application pool to website..."
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set app "${siteName}/" /applicationPool:$appPoolName
+          
+          Write-Host "[SUCCESS] Website configured with appcmd"
+          
+        } catch {
+          Write-Warning "[WARNING] appcmd method failed for website: $($_.Exception.Message)"
+          
+          # Method 2: Fallback to PowerShell WebAdministration
+          try {
+            Write-Host "Trying PowerShell WebAdministration for website..."
+            Import-Module WebAdministration -Force
+            
+            if (!(Get-Website -Name $siteName -ErrorAction SilentlyContinue)) {
+              New-Website -Name $siteName -PhysicalPath $sitePath -Port $port -ApplicationPool $appPoolName
+              Write-Host "[SUCCESS] Website created with PowerShell"
+            } else {
+              # Update existing website
+              Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name physicalPath -Value $sitePath
+              Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name applicationPool -Value $appPoolName
+              Write-Host "[SUCCESS] Website updated with PowerShell"
+            }
+            
+            # Stop website
+            Stop-Website -Name $siteName -ErrorAction SilentlyContinue
+            
+          } catch {
+            Write-Error "Both appcmd and PowerShell methods failed for website management: $($_.Exception.Message)"
+            throw
+          }
+        }
+        
+        # Set permissions
+        Write-Host "Setting permissions for IIS_IUSRS..."
+        try {
+          icacls $sitePath /grant "IIS_IUSRS:(OI)(CI)F" /T /Q
+          Write-Host "[SUCCESS] Permissions set successfully"
+        } catch {
+          Write-Warning "[WARNING] Could not set permissions: $($_.Exception.Message)"
+        }
+        
+        Write-Host "[SUCCESS] IIS Web App Manage task completed"
+
+    # ================================
+    # IIS WEB APP DEPLOY TASK (Azure DevOps equivalent)
+    # ================================
     - name: Create backup of current deployment
       shell: powershell
       run: |
-        Write-Host "Creating backup of current deployment..."
+        Write-Host "=== BACKUP CURRENT DEPLOYMENT ==="
         
         $backupDir = "${{ env.BACKUP_PATH }}\$(Get-Date -Format 'yyyyMMdd-HHmmss')-${{ github.sha }}"
         
@@ -235,336 +416,198 @@ jobs:
           Write-Host "[INFO] No existing deployment found, skipping backup"
         }
 
-    - name: Stop IIS Application Pool
+    - name: IIS Web App Deploy - Deploy Application Files
       shell: powershell
       run: |
-        Write-Host "Managing IIS Application Pool: ${{ env.IIS_APP_POOL }}"
+        Write-Host "=== IIS WEB APP DEPLOY TASK ==="
+        Write-Host "Deploying application files to IIS..."
         
-        # Import WebAdministration module with error handling
-        try {
-          Import-Module WebAdministration -Force -ErrorAction Stop
-          Write-Host "[INFO] WebAdministration module loaded successfully"
-        } catch {
-          Write-Warning "[WARNING] Failed to load WebAdministration module: $($_.Exception.Message)"
-          Write-Host "[INFO] Attempting to enable IIS features..."
-          
-          # Enable IIS features if not already enabled
-          Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart -ErrorAction SilentlyContinue
-          Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart -ErrorAction SilentlyContinue
-          Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerManagementTools -All -NoRestart -ErrorAction SilentlyContinue
-          
-          # Try importing again
-          Import-Module WebAdministration -Force -ErrorAction Stop
-        }
-        
-        # Check if application pool exists using alternative method
-        try {
-          $appPoolExists = Get-ChildItem -Path "IIS:\AppPools" | Where-Object { $_.Name -eq "${{ env.IIS_APP_POOL }}" }
-          
-          if ($appPoolExists) {
-            Write-Host "Application pool exists, attempting to stop..."
-            
-            # Stop using appcmd if available, fallback to PowerShell cmdlets
-            try {
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool "${{ env.IIS_APP_POOL }}"
-              Write-Host "[SUCCESS] Application pool stopped using appcmd"
-            } catch {
-              Write-Host "Appcmd failed, trying PowerShell cmdlet..."
-              Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-              
-              # Wait for app pool to stop
-              $timeout = 30
-              $elapsed = 0
-              do {
-                Start-Sleep -Seconds 2
-                $elapsed += 2
-                try {
-                  $state = (Get-WebAppPoolState -Name "${{ env.IIS_APP_POOL }}").Value
-                  Write-Host "App pool state: $state (waiting $elapsed/$timeout seconds)"
-                } catch {
-                  Write-Host "Could not determine app pool state, assuming stopped"
-                  break
-                }
-              } while ($state -ne "Stopped" -and $elapsed -lt $timeout)
-              
-              if ($state -eq "Stopped") {
-                Write-Host "[SUCCESS] Application pool stopped successfully"
-              } else {
-                Write-Warning "[WARNING] Application pool did not stop within timeout, continuing anyway"
-              }
-            }
-          } else {
-            Write-Host "[INFO] Application pool does not exist, will be created during deployment"
-          }
-        } catch {
-          Write-Warning "[WARNING] Could not check application pool status: $($_.Exception.Message)"
-          Write-Host "[INFO] Continuing with deployment..."
-        }
-
-    - name: Deploy to IIS
-      shell: powershell
-      run: |
-        Write-Host "Deploying application to IIS..."
+        $sourcePath = "${{ env.PUBLISH_PATH }}"
+        $targetPath = "${{ env.IIS_SITE_PATH }}"
         
         # Ensure target directory exists
-        if (!(Test-Path ${{ env.IIS_SITE_PATH }})) {
-          New-Item -ItemType Directory -Path ${{ env.IIS_SITE_PATH }} -Force | Out-Null
-          Write-Host "Created IIS site directory: ${{ env.IIS_SITE_PATH }}"
+        if (!(Test-Path $targetPath)) {
+          New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+          Write-Host "Created target directory: $targetPath"
         }
         
-        # Copy published files
+        # Stop application pool and website before deployment
+        Write-Host "Stopping IIS services for deployment..."
+        try {
+          # Stop using appcmd
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop apppool "${{ env.IIS_APP_POOL }}" 2>&1 | Out-Null
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" stop site "${{ env.IIS_SITE_NAME }}" 2>&1 | Out-Null
+          Write-Host "[SUCCESS] Services stopped with appcmd"
+        } catch {
+          Write-Warning "[WARNING] Could not stop services with appcmd: $($_.Exception.Message)"
+          # Fallback to PowerShell
+          try {
+            Import-Module WebAdministration -Force
+            Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
+            Stop-Website -Name "${{ env.IIS_SITE_NAME }}" -ErrorAction SilentlyContinue
+            Write-Host "[SUCCESS] Services stopped with PowerShell"
+          } catch {
+            Write-Warning "[WARNING] Could not stop services with PowerShell: $($_.Exception.Message)"
+          }
+        }
+        
+        # Wait for services to stop
+        Start-Sleep -Seconds 3
+        
+        # Deploy files
         Write-Host "Copying application files..."
-        Copy-Item -Path "${{ env.PUBLISH_PATH }}\*" -Destination ${{ env.IIS_SITE_PATH }} -Recurse -Force
-        
-        # Set appropriate permissions
-        Write-Host "Setting directory permissions..."
-        $acl = Get-Acl ${{ env.IIS_SITE_PATH }}
-        $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("IIS_IUSRS", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
-        $acl.SetAccessRule($accessRule)
-        $accessRule2 = New-Object System.Security.AccessControl.FileSystemAccessRule("IUSR", "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
-        $acl.SetAccessRule($accessRule2)
-        Set-Acl -Path ${{ env.IIS_SITE_PATH }} -AclObject $acl
-        
-        Write-Host "[SUCCESS] Application files deployed successfully"
-
-    - name: Configure IIS Application Pool
-      shell: powershell
-      run: |
-        Write-Host "Configuring IIS Application Pool..."
-        
-        Import-Module WebAdministration -Force
-        
-        # Create or update application pool using multiple methods
         try {
-          # Method 1: Check using IIS drive
-          $appPoolExists = Get-ChildItem -Path "IIS:\AppPools" | Where-Object { $_.Name -eq "${{ env.IIS_APP_POOL }}" }
+          # Remove old files (except logs and data directories)
+          Write-Host "Cleaning target directory (preserving logs)..."
+          Get-ChildItem -Path $targetPath -Exclude "logs", "data", "uploads" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           
-          if (!$appPoolExists) {
-            Write-Host "Creating new application pool..."
-            
-            # Try using appcmd first
-            try {
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:"${{ env.IIS_APP_POOL }}"
-              Write-Host "[SUCCESS] Application pool created using appcmd"
-            } catch {
-              # Fallback to PowerShell cmdlet
-              New-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -Force
-              Write-Host "[SUCCESS] Application pool created using PowerShell"
-            }
-          } else {
-            Write-Host "Application pool already exists"
-          }
+          # Copy new files
+          Write-Host "Copying new files from $sourcePath to $targetPath"
+          Copy-Item -Path "$sourcePath\*" -Destination $targetPath -Recurse -Force
           
-          # Configure application pool settings using appcmd
-          Write-Host "Configuring application pool settings..."
+          Write-Host "[SUCCESS] Application files deployed successfully"
           
-          try {
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool "${{ env.IIS_APP_POOL }}" /managedRuntimeVersion:""
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool "${{ env.IIS_APP_POOL }}" /startMode:AlwaysRunning
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool "${{ env.IIS_APP_POOL }}" /processModel.idleTimeout:00:00:00
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool "${{ env.IIS_APP_POOL }}" /recycling.periodicRestart.time:00:00:00
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set apppool "${{ env.IIS_APP_POOL }}" /processModel.loadUserProfile:true
-            Write-Host "[SUCCESS] Application pool configured using appcmd"
-          } catch {
-            Write-Host "Appcmd configuration failed, trying PowerShell cmdlets..."
-            
-            # Fallback to PowerShell cmdlets
-            Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "managedRuntimeVersion" -Value "" -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "startMode" -Value "AlwaysRunning" -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "processModel.idleTimeout" -Value "00:00:00" -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "recycling.periodicRestart.time" -Value "00:00:00" -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path "IIS:\AppPools\${{ env.IIS_APP_POOL }}" -Name "processModel.loadUserProfile" -Value $true -ErrorAction SilentlyContinue
-            Write-Host "[SUCCESS] Application pool configured using PowerShell"
-          }
+          # Display deployed files
+          Write-Host "Deployed files:"
+          Get-ChildItem -Path $targetPath | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
           
         } catch {
-          Write-Warning "[WARNING] Application pool configuration encountered issues: $($_.Exception.Message)"
-          Write-Host "[INFO] Continuing with deployment..."
+          Write-Error "File deployment failed: $($_.Exception.Message)"
+          throw
         }
         
-        Write-Host "[SUCCESS] Application pool configuration completed"
-
-    - name: Configure IIS Website
-      shell: powershell
-      run: |
-        Write-Host "Configuring IIS Website..."
-        
-        Import-Module WebAdministration -Force
-        
+        # Set permissions after deployment
+        Write-Host "Setting post-deployment permissions..."
         try {
-          # Remove existing site if it exists using multiple methods
-          try {
-            $existingSite = Get-Website -Name "${{ env.IIS_SITE_NAME }}" -ErrorAction SilentlyContinue
-            if ($existingSite) {
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" delete site "${{ env.IIS_SITE_NAME }}"
-              Write-Host "Removed existing website using appcmd: ${{ env.IIS_SITE_NAME }}"
-            }
-          } catch {
-            Write-Host "No existing website found or removal failed, continuing..."
-          }
-          
-          # Create new website using appcmd
-          Write-Host "Creating new website..."
-          try {
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"${{ env.IIS_SITE_NAME }}" /physicalPath:"${{ env.IIS_SITE_PATH }}" /bindings:http/*:80:
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site "${{ env.IIS_SITE_NAME }}" /applicationPool:"${{ env.IIS_APP_POOL }}"
-            Write-Host "[SUCCESS] Website created using appcmd"
-          } catch {
-            Write-Host "Appcmd failed, trying PowerShell cmdlet..."
-            
-            # Fallback to PowerShell cmdlet
-            New-Website -Name "${{ env.IIS_SITE_NAME }}" `
-              -PhysicalPath "${{ env.IIS_SITE_PATH }}" `
-              -ApplicationPool "${{ env.IIS_APP_POOL }}" `
-              -Port 80 -Force
-            Write-Host "[SUCCESS] Website created using PowerShell"
-          }
-          
-          Write-Host "[SUCCESS] Website configured successfully"
-          Write-Host "Site: ${{ env.IIS_SITE_NAME }}"
-          Write-Host "Path: ${{ env.IIS_SITE_PATH }}"
-          Write-Host "Pool: ${{ env.IIS_APP_POOL }}"
-          Write-Host "Port: 80"
-          
+          icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)R" /T /Q
+          icacls "$targetPath\logs" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null
+          Write-Host "[SUCCESS] Permissions updated"
         } catch {
-          Write-Warning "[WARNING] Website configuration encountered issues: $($_.Exception.Message)"
-          Write-Host "[INFO] Continuing with deployment..."
+          Write-Warning "[WARNING] Could not update permissions: $($_.Exception.Message)"
         }
+        
+        Write-Host "[SUCCESS] IIS Web App Deploy task completed"
 
-    - name: Start IIS Application Pool
+    - name: Start IIS Services
       shell: powershell
       run: |
-        Write-Host "Starting IIS Application Pool..."
+        Write-Host "=== STARTING IIS SERVICES ==="
         
-        Import-Module WebAdministration -Force
-        
+        # Start application pool and website
         try {
-          # Start application pool using multiple methods
-          try {
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" start apppool "${{ env.IIS_APP_POOL }}"
-            Write-Host "[SUCCESS] Application pool started using appcmd"
-          } catch {
-            Write-Host "Appcmd failed, trying PowerShell cmdlet..."
-            Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
-            Write-Host "[SUCCESS] Application pool started using PowerShell"
-          }
+          Write-Host "Starting application pool: ${{ env.IIS_APP_POOL }}"
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" start apppool "${{ env.IIS_APP_POOL }}"
           
           # Wait for app pool to start
-          $timeout = 30
-          $elapsed = 0
-          $started = $false
+          Start-Sleep -Seconds 2
           
-          do {
-            Start-Sleep -Seconds 2
-            $elapsed += 2
-            
-            try {
-              # Try multiple methods to check state
-              try {
-                $state = (Get-WebAppPoolState -Name "${{ env.IIS_APP_POOL }}").Value
-              } catch {
-                # Fallback to appcmd
-                $appcmdResult = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool "${{ env.IIS_APP_POOL }}" /text:state
-                $state = $appcmdResult.Trim()
-              }
-              
-              Write-Host "App pool state: $state (waiting $elapsed/$timeout seconds)"
-              
-              if ($state -eq "Started") {
-                $started = $true
-                break
-              }
-            } catch {
-              Write-Host "Could not determine app pool state, assuming it's starting..."
-              if ($elapsed -gt 10) {
-                $started = $true
-                break
-              }
-            }
-          } while ($elapsed -lt $timeout)
+          Write-Host "Starting website: ${{ env.IIS_SITE_NAME }}"
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" start site "${{ env.IIS_SITE_NAME }}"
           
-          if ($started) {
-            Write-Host "[SUCCESS] Application pool started successfully"
-          } else {
-            Write-Warning "[WARNING] Application pool may not have started within timeout, but continuing..."
-          }
+          Write-Host "[SUCCESS] IIS services started with appcmd"
           
         } catch {
-          Write-Warning "[WARNING] Application pool start encountered issues: $($_.Exception.Message)"
-          Write-Host "[INFO] Continuing with deployment..."
+          Write-Warning "[WARNING] appcmd start failed: $($_.Exception.Message)"
+          
+          # Fallback to PowerShell
+          try {
+            Import-Module WebAdministration -Force
+            Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
+            Start-Sleep -Seconds 2
+            Start-Website -Name "${{ env.IIS_SITE_NAME }}"
+            Write-Host "[SUCCESS] IIS services started with PowerShell"
+          } catch {
+            Write-Error "Failed to start IIS services: $($_.Exception.Message)"
+            throw
+          }
+        }
+        
+        # Verify services are running
+        Start-Sleep -Seconds 3
+        Write-Host "Verifying service status..."
+        try {
+          $appPoolStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool "${{ env.IIS_APP_POOL }}" /text:state 2>&1
+          $siteStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list site "${{ env.IIS_SITE_NAME }}" /text:state 2>&1
+          
+          Write-Host "Application Pool Status: $appPoolStatus"
+          Write-Host "Website Status: $siteStatus"
+        } catch {
+          Write-Warning "[WARNING] Could not verify service status"
         }
 
     - name: Health Check
+      if: ${{ inputs.force_deploy != 'true' }}
       shell: powershell
-      if: ${{ !inputs.force_deploy }}
       run: |
-        Write-Host "Performing health check..."
+        Write-Host "=== HEALTH CHECK ==="
+        Write-Host "Performing application health check..."
         
         $maxAttempts = 10
-        $delay = 5
+        $delaySeconds = 5
         $healthCheckUrl = "http://localhost"
         
         for ($i = 1; $i -le $maxAttempts; $i++) {
           try {
-            Write-Host "Health check attempt $i/$maxAttempts..."
-            $response = Invoke-WebRequest -Uri $healthCheckUrl -TimeoutSec 10 -UseBasicParsing
+            Write-Host "Health check attempt $i of $maxAttempts..."
+            
+            $response = Invoke-WebRequest -Uri $healthCheckUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
             
             if ($response.StatusCode -eq 200) {
-              Write-Host "[SUCCESS] Health check passed! Application is responding"
-              Write-Host "Status Code: $($response.StatusCode)"
+              Write-Host "[SUCCESS] Application is healthy! Status Code: $($response.StatusCode)"
+              Write-Host "Response length: $($response.Content.Length) characters"
               break
             } else {
               Write-Warning "[WARNING] Unexpected status code: $($response.StatusCode)"
             }
+            
           } catch {
-            Write-Warning "[WARNING] Health check failed: $($_.Exception.Message)"
+            Write-Warning "[WARNING] Health check attempt $i failed: $($_.Exception.Message)"
             
             if ($i -eq $maxAttempts) {
-              throw "[ERROR] Health check failed after $maxAttempts attempts"
+              Write-Error "Health check failed after $maxAttempts attempts"
+              Write-Host "=== TROUBLESHOOTING INFORMATION ==="
+              
+              # Check application pool status
+              try {
+                $appPoolStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool "${{ env.IIS_APP_POOL }}" 2>&1
+                Write-Host "App Pool Status: $appPoolStatus"
+              } catch { }
+              
+              # Check website status
+              try {
+                $siteStatus = & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list site "${{ env.IIS_SITE_NAME }}" 2>&1
+                Write-Host "Website Status: $siteStatus"
+              } catch { }
+              
+              # Check recent event logs
+              try {
+                Write-Host "Recent Application Event Logs:"
+                Get-EventLog -LogName Application -Source "*IIS*" -Newest 5 -ErrorAction SilentlyContinue | Format-Table -AutoSize
+              } catch { }
+              
+              throw "Deployment failed health check"
             }
             
-            Write-Host "Waiting $delay seconds before retry..."
-            Start-Sleep -Seconds $delay
+            Write-Host "Waiting $delaySeconds seconds before next attempt..."
+            Start-Sleep -Seconds $delaySeconds
           }
         }
 
     - name: Deployment Summary
       shell: powershell
-      if: always()
       run: |
-        Write-Host ""
         Write-Host "=== DEPLOYMENT SUMMARY ==="
-        Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-        Write-Host "Branch: ${{ github.ref_name }}"
-        Write-Host "Commit: ${{ github.sha }}"
-        Write-Host "Environment: ${{ inputs.environment || 'production' }}"
-        Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
-        Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
-        Write-Host "App Pool: ${{ env.IIS_APP_POOL }}"
-        
-        try {
-          Import-Module WebAdministration -ErrorAction SilentlyContinue
-          $appPoolState = (Get-IISAppPool -Name ${{ env.IIS_APP_POOL }} -ErrorAction SilentlyContinue).State
-          $websiteState = (Get-Website -Name ${{ env.IIS_SITE_NAME }} -ErrorAction SilentlyContinue).State
-          
-          Write-Host "App Pool Status: $appPoolState"
-          Write-Host "Website Status: $websiteState"
-        } catch {
-          Write-Host "Could not retrieve IIS status"
-        }
-        
-        Write-Host "Access URL: http://localhost"
-        Write-Host "=========================="
-
-    - name: Cleanup
-      shell: powershell
-      if: always()
-      run: |
-        Write-Host "Cleaning up temporary files..."
-        
-        if (Test-Path ${{ env.PUBLISH_PATH }}) {
-          Remove-Item -Path ${{ env.PUBLISH_PATH }} -Recurse -Force
-          Write-Host "[SUCCESS] Cleaned publish directory"
-        }
-        
-        Write-Host "[SUCCESS] Cleanup completed" 
+        Write-Host "Deployment completed successfully!"
+        Write-Host ""
+        Write-Host "Details:"
+        Write-Host "- Branch: ${{ github.ref_name }}"
+        Write-Host "- Commit: ${{ github.sha }}"
+        Write-Host "- Environment: ${{ inputs.environment || 'production' }}"
+        Write-Host "- IIS Site: ${{ env.IIS_SITE_NAME }}"
+        Write-Host "- App Pool: ${{ env.IIS_APP_POOL }}"
+        Write-Host "- Deploy Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "- Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+        Write-Host ""
+        Write-Host "Application URL: http://localhost"
+        Write-Host ""
+        Write-Host "[SUCCESS] Deployment completed successfully!" 
