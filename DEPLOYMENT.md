@@ -158,6 +158,28 @@ icacls "C:\inetpub\wwwroot\TodoApp"
 icacls "C:\inetpub\wwwroot\TodoApp" /grant "IIS_IUSRS:(OI)(CI)F" /T
 ```
 
+**Test-Path Access Denied Errors**
+- **Error**: `Test-Path : Access is denied` when checking `redirection.config`
+- **Cause**: GitHub Actions runner lacks permission to access IIS configuration directory
+- **Solution**: The workflow automatically handles this:
+  - Catches `UnauthorizedAccessException` and continues deployment
+  - Uses multiple fallback methods to create `redirection.config` if needed
+  - Employs both PowerShell `Out-File` and .NET `File.WriteAllText` methods
+  - Verifies IIS accessibility using `appcmd.exe` instead of PowerShell cmdlets
+- **Note**: These permission issues don't prevent deployment from succeeding
+
+**IIS Configuration Issues**
+```powershell
+# Check if redirection.config exists
+Test-Path "$env:SystemRoot\System32\inetsrv\config\redirection.config"
+
+# Verify IIS configuration access
+& "$env:SystemRoot\System32\inetsrv\appcmd.exe" list config -section:system.webServer/globalModules
+
+# Check application pool using appcmd (more reliable than PowerShell)
+& "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool "TodoMVCAppPool"
+```
+
 ### Rollback Process
 
 If deployment fails, you can rollback:
