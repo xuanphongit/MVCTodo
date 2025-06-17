@@ -101,10 +101,10 @@ jobs:
         # Check if running as Administrator
         $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
         if ($isAdmin) {
-          Write-Host "[✓] Running as Administrator" -ForegroundColor Green
+          Write-Host "[OK] Running as Administrator" -ForegroundColor Green
         } else {
           $errors += "Not running as Administrator - some operations may fail"
-          Write-Warning "[!] Not running as Administrator"
+          Write-Warning "[WARNING] Not running as Administrator"
         }
         
         # Check Web Deploy installation
@@ -117,45 +117,45 @@ jobs:
         foreach ($path in $webDeployPaths) {
           if (Test-Path $path) {
             $msdeployPath = $path
-            Write-Host "[✓] Web Deploy V3 found at: $path" -ForegroundColor Green
+            Write-Host "[OK] Web Deploy V3 found at: $path" -ForegroundColor Green
             break
           }
         }
         
         if (!$msdeployPath) {
           $errors += "Web Deploy V3 not found - please install it"
-          Write-Error "[✗] Web Deploy V3 not found!"
+          Write-Error "[ERROR] Web Deploy V3 not found!"
         } else {
           # Get and validate Web Deploy version
           try {
             $version = & "$msdeployPath" -version 2>&1 | Select-String "Microsoft Web Deploy" | Select-Object -First 1
-            Write-Host "[✓] $version" -ForegroundColor Green
+            Write-Host "[OK] $version" -ForegroundColor Green
             $env:MSDEPLOY_PATH = $msdeployPath
           } catch {
-            Write-Warning "[!] Could not get Web Deploy version: $($_.Exception.Message)"
+            Write-Warning "[WARNING] Could not get Web Deploy version: $($_.Exception.Message)"
           }
         }
         
         # Check .NET SDK
         try {
           $dotnetVersion = dotnet --version
-          Write-Host "[✓] .NET SDK Version: $dotnetVersion" -ForegroundColor Green
+          Write-Host "[OK] .NET SDK Version: $dotnetVersion" -ForegroundColor Green
         } catch {
           $errors += ".NET SDK not found - please install .NET ${{ env.DOTNET_VERSION }} SDK"
-          Write-Error "[✗] .NET SDK not found"
+          Write-Error "[ERROR] .NET SDK not found"
         }
         
         # Check IIS installation
         try {
           $iisService = Get-Service W3SVC -ErrorAction SilentlyContinue
           if ($iisService) {
-            Write-Host "[✓] IIS Service Status: $($iisService.Status)" -ForegroundColor Green
+            Write-Host "[OK] IIS Service Status: $($iisService.Status)" -ForegroundColor Green
           } else {
             $errors += "IIS service not found - please install IIS"
-            Write-Error "[✗] IIS service not found"
+            Write-Error "[ERROR] IIS service not found"
           }
         } catch {
-          Write-Warning "[!] Could not check IIS service: $($_.Exception.Message)"
+          Write-Warning "[WARNING] Could not check IIS service: $($_.Exception.Message)"
         }
         
         # Check disk space (minimum 1GB free)
@@ -163,13 +163,13 @@ jobs:
           $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'"
           $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
           if ($freeSpaceGB -gt 1) {
-            Write-Host "[✓] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
+            Write-Host "[OK] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
           } else {
             $errors += "Insufficient disk space (${freeSpaceGB}GB available, minimum 1GB required)"
-            Write-Warning "[!] Low disk space: ${freeSpaceGB}GB"
+            Write-Warning "[WARNING] Low disk space: ${freeSpaceGB}GB"
           }
         } catch {
-          Write-Warning "[!] Could not check disk space: $($_.Exception.Message)"
+          Write-Warning "[WARNING] Could not check disk space: $($_.Exception.Message)"
         }
         
         # Summary
@@ -565,7 +565,7 @@ jobs:
         if (!$isAdmin) {
           Write-Host ""
           Write-Host "============================================"
-          Write-Host "⚠️  MANUAL IIS SETUP REQUIRED"
+          Write-Host "WARNING: MANUAL IIS SETUP REQUIRED"
           Write-Host "============================================"
           Write-Host ""
           Write-Host "Since deployment is running without Administrator privileges,"
@@ -896,7 +896,7 @@ jobs:
             if ($targetPath -like "*Temp*") {
               Write-Host ""
               Write-Host "============================================"
-              Write-Host "📋 MANUAL STEP REQUIRED"
+              Write-Host "MANUAL STEP REQUIRED"
               Write-Host "============================================"
               Write-Host ""
               Write-Host "Files were deployed to temporary directory due to permission restrictions."
@@ -912,14 +912,14 @@ jobs:
               Write-Host "============================================"
             } else {
               Write-Host ""
-              Write-Host "🎉 Deployment completed successfully to IIS directory!"
+              Write-Host "SUCCESS: Deployment completed successfully to IIS directory!"
               Write-Host "Your application should now be accessible via web browser."
             }
           }
         } else {
           Write-Host ""
           Write-Host "============================================"
-          Write-Host "⚠️  DEPLOYMENT COULD NOT BE COMPLETED"
+          Write-Host "WARNING: DEPLOYMENT COULD NOT BE COMPLETED"
           Write-Host "============================================"
           Write-Host ""
           Write-Host "Possible solutions:"
@@ -989,7 +989,6 @@ jobs:
                 Write-Host "  URL: $url"
                 Write-Host "  Status Code: $($response.StatusCode)"
                 Write-Host "  Response Size: $($response.Content.Length) bytes"
-                Write-Host "  Response Time: $(((Get-Date) - $startTime).TotalSeconds) seconds"
                 $healthCheckPassed = $true
                 break
               } else {
@@ -1033,14 +1032,21 @@ jobs:
         Write-Host "=== DEPLOYMENT SUMMARY ===" -ForegroundColor Cyan
         
         $endTime = Get-Date
-        $deploymentDuration = if ($startTime) { ($endTime - $startTime).TotalMinutes } else { 0 }
+        # Calculate deployment duration from job start (approximate)
+        $deploymentDuration = 0
+        try {
+          $workflowStartTime = [DateTime]::Parse("${{ github.event.head_commit.timestamp }}")
+          $deploymentDuration = ($endTime - $workflowStartTime).TotalMinutes
+        } catch {
+          $deploymentDuration = 0
+        }
         $environment = "${{ inputs.environment || 'production' }}"
         $success = $env:GITHUB_JOB_STATUS -eq 'success'
         
         Write-Host ""
-        Write-Host "📊 Deployment Metrics:" -ForegroundColor White
+        Write-Host "Deployment Metrics:" -ForegroundColor White
         Write-Host "  Environment: $environment"
-        Write-Host "  Status: $(if($success){'✅ SUCCESS'}else{'❌ FAILED'})"
+        Write-Host "  Status: $(if($success){'SUCCESS'}else{'FAILED'})"
         Write-Host "  Duration: $([math]::Round($deploymentDuration, 2)) minutes"
         Write-Host "  Method: ${{ inputs.web_deploy_method || 'auto' }}"
         Write-Host "  Branch: ${{ github.ref_name }}"
@@ -1048,7 +1054,7 @@ jobs:
         Write-Host "  Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
         
         Write-Host ""
-        Write-Host "🎯 Deployment Details:" -ForegroundColor White
+        Write-Host "Deployment Details:" -ForegroundColor White
         Write-Host "  IIS Site: ${{ env.IIS_SITE_NAME }}"
         Write-Host "  App Pool: ${{ env.IIS_APP_POOL }}"
         Write-Host "  Deploy Path: ${{ env.IIS_SITE_PATH }}"
@@ -1068,31 +1074,31 @@ jobs:
         
         Write-Host ""
         if ($success) {
-          Write-Host "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
+          Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
           Write-Host ""
           Write-Host "Next Steps:" -ForegroundColor Yellow
-          Write-Host "  • Verify application functionality"
-          Write-Host "  • Monitor application logs"
-          Write-Host "  • Check performance metrics"
-          Write-Host "  • Update monitoring dashboards"
+          Write-Host "  - Verify application functionality"
+          Write-Host "  - Monitor application logs"
+          Write-Host "  - Check performance metrics"
+          Write-Host "  - Update monitoring dashboards"
           
           if ($environment -eq "production") {
             Write-Host ""
             Write-Host "Production Checklist:" -ForegroundColor Magenta
-            Write-Host "  • SSL certificate configured"
-            Write-Host "  • Security headers enabled"
-            Write-Host "  • Monitoring alerts active"
-            Write-Host "  • Backup verification"
+            Write-Host "  - SSL certificate configured"
+            Write-Host "  - Security headers enabled"
+            Write-Host "  - Monitoring alerts active"
+            Write-Host "  - Backup verification"
           }
         } else {
-          Write-Host "💥 DEPLOYMENT FAILED!" -ForegroundColor Red
+          Write-Host "DEPLOYMENT FAILED!" -ForegroundColor Red
           Write-Host ""
           Write-Host "Troubleshooting Resources:" -ForegroundColor Yellow
-          Write-Host "  • Check GitHub Actions logs above"
-          Write-Host "  • Review Windows Event Logs"
-          Write-Host "  • Verify IIS configuration"
-          Write-Host "  • Check file permissions"
-          Write-Host "  • Consult WEB-DEPLOY-TROUBLESHOOTING.md"
+          Write-Host "  - Check GitHub Actions logs above"
+          Write-Host "  - Review Windows Event Logs"
+          Write-Host "  - Verify IIS configuration"
+          Write-Host "  - Check file permissions"
+          Write-Host "  - Consult WEB-DEPLOY-TROUBLESHOOTING.md"
           
           # Show rollback information
           $latestBackup = Get-ChildItem -Path "${{ env.BACKUP_PATH }}" -Directory -ErrorAction SilentlyContinue | 
@@ -1101,7 +1107,7 @@ jobs:
           
           if ($latestBackup) {
             Write-Host ""
-            Write-Host "🔄 Rollback Available:" -ForegroundColor Cyan
+            Write-Host "Rollback Available:" -ForegroundColor Cyan
             Write-Host "  Latest backup: $($latestBackup.Name)"
             Write-Host "  Location: $($latestBackup.FullName)"
             Write-Host "  To rollback: Copy contents to ${{ env.IIS_SITE_PATH }}"
@@ -1109,10 +1115,10 @@ jobs:
         }
         
         Write-Host ""
-        Write-Host "📞 Support:" -ForegroundColor White
-        Write-Host "  • Documentation: README.md, DEPLOYMENT.md"
-        Write-Host "  • Troubleshooting: WEB-DEPLOY-TROUBLESHOOTING.md"
-        Write-Host "  • Scripts: scripts/ directory"
+        Write-Host "Support:" -ForegroundColor White
+        Write-Host "  - Documentation: README.md, DEPLOYMENT.md"
+        Write-Host "  - Troubleshooting: WEB-DEPLOY-TROUBLESHOOTING.md"
+        Write-Host "  - Scripts: scripts/ directory"
         Write-Host ""
         Write-Host "===============================================" -ForegroundColor Cyan
 
@@ -1126,7 +1132,7 @@ jobs:
         
         if ($webhook) {
           try {
-            $status = if ($success) { "✅ SUCCESS" } else { "❌ FAILED" }
+                         $status = if ($success) { "SUCCESS" } else { "FAILED" }
             $color = if ($success) { "good" } else { "danger" }
             
             $payload = @{
