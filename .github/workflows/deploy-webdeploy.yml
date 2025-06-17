@@ -518,10 +518,43 @@ jobs:
         $packagePath = "${{ env.PACKAGE_PATH }}\TodoApp.zip"
         $method = "${{ inputs.web_deploy_method || 'auto' }}"
         
+        # Convert to absolute paths to avoid path resolution issues
+        $sourcePath = Resolve-Path $sourcePath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path
+        if (!$sourcePath) {
+          $sourcePath = "${{ env.PUBLISH_PATH }}"
+        }
+        
+        $packagePath = if (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip") {
+          Resolve-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip" | Select-Object -ExpandProperty Path
+        } else {
+          "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+        }
+        
         Write-Host "Deployment method: $method"
         Write-Host "Source path: $sourcePath"
         Write-Host "Target path: $targetPath"
+        Write-Host "Package path: $packagePath"
         Write-Host "Target site: $siteName"
+        
+        # Debug: Show current working directory and file existence
+        Write-Host ""
+        Write-Host "=== DEBUG INFORMATION ==="
+        Write-Host "Current working directory: $(Get-Location)"
+        Write-Host "Source exists: $(Test-Path $sourcePath)"
+        Write-Host "Package exists: $(Test-Path $packagePath)"
+        Write-Host "Target directory exists: $(Test-Path $targetPath)"
+        
+        if (Test-Path $sourcePath) {
+          $sourceFiles = Get-ChildItem -Path $sourcePath -Recurse -File | Measure-Object
+          Write-Host "Source files count: $($sourceFiles.Count)"
+        }
+        
+        if (Test-Path $packagePath) {
+          $packageInfo = Get-Item $packagePath
+          Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
+        }
+        Write-Host "=== END DEBUG INFORMATION ==="
+        Write-Host ""
         
         # Verify source exists
         if (!(Test-Path $sourcePath)) {
@@ -534,19 +567,46 @@ jobs:
           Write-Host "Target directory does not exist, attempting to create: $targetPath"
           try {
             if ($isAdmin) {
+              # Create directory with full path
               New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
               Write-Host "[SUCCESS] Created target directory: $targetPath"
+              
+              # Set proper permissions
+              try {
+                icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
+                icacls $targetPath /grant "IUSR:(OI)(CI)R" /T | Out-Null
+                Write-Host "[SUCCESS] Set IIS permissions on target directory"
+              } catch {
+                Write-Warning "[WARNING] Could not set permissions: $($_.Exception.Message)"
+              }
             } else {
               Write-Warning "[WARNING] Cannot create target directory without admin privileges"
               Write-Host "[INFO] Please create the directory manually as Administrator:"
               Write-Host "       New-Item -ItemType Directory -Path '$targetPath' -Force"
               Write-Host "       icacls '$targetPath' /grant 'IIS_IUSRS:(OI)(CI)F' /T"
+              Write-Host "       icacls '$targetPath' /grant 'IUSR:(OI)(CI)R' /T"
               Write-Host ""
-              Write-Host "[INFO] Will attempt deployment to existing directory or fail gracefully"
+              
+              # Try to create in a temporary location for testing
+              $tempPath = "$env:TEMP\TodoApp_Deploy_Test"
+              try {
+                New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
+                Write-Host "[INFO] Created temporary directory for testing: $tempPath"
+                Write-Host "[INFO] You can manually copy files from here to IIS directory later"
+                
+                # Update target path to temp for this deployment
+                $originalTargetPath = $targetPath
+                $targetPath = $tempPath
+                Write-Host "[INFO] Using temporary target path: $targetPath"
+              } catch {
+                Write-Warning "[WARNING] Could not create temporary directory: $($_.Exception.Message)"
+              }
             }
           } catch {
             Write-Warning "[WARNING] Failed to create target directory: $($_.Exception.Message)"
           }
+        } else {
+          Write-Host "[INFO] Target directory already exists: $targetPath"
         }
         
         # Choose deployment method
@@ -555,10 +615,22 @@ jobs:
         # Method 1: Try package deployment if package exists and we have admin rights
         if ((Test-Path $packagePath) -and $isAdmin -and ($method -eq "auto" -or $method -eq "package")) {
           Write-Host "Attempting package deployment..."
+          Write-Host "Package file: $packagePath"
+          Write-Host "Target IIS app: $siteName"
+          
           try {
+            # Use absolute path for package to avoid path resolution issues
+            $absolutePackagePath = if ([System.IO.Path]::IsPathRooted($packagePath)) { 
+              $packagePath 
+            } else { 
+              Join-Path (Get-Location) $packagePath 
+            }
+            
+            Write-Host "Using absolute package path: $absolutePackagePath"
+            
             & "$msdeployPath" `
               -verb:sync `
-              -source:package="$packagePath" `
+              -source:package="$absolutePackagePath" `
               -dest:iisApp="$siteName",computerName=localhost `
               -enableRule:AppOffline `
               -enableRule:DoNotDeleteRule `
@@ -593,9 +665,21 @@ jobs:
             }
             
             # Sync files using Web Deploy
+            Write-Host "Syncing from: $sourcePath"
+            Write-Host "Syncing to: $targetPath"
+            
+            # Use absolute paths for both source and destination
+            $absoluteSourcePath = if ([System.IO.Path]::IsPathRooted($sourcePath)) { 
+              $sourcePath 
+            } else { 
+              Join-Path (Get-Location) $sourcePath 
+            }
+            
+            Write-Host "Using absolute source path: $absoluteSourcePath"
+            
             & "$msdeployPath" `
               -verb:sync `
-              -source:contentPath="$sourcePath" `
+              -source:contentPath="$absoluteSourcePath" `
               -dest:contentPath="$targetPath",computerName=localhost `
               -enableRule:DoNotDeleteRule `
               -skip:Directory="\\logs$" `
@@ -648,8 +732,27 @@ jobs:
             
             # Copy files
             Write-Host "Copying files from $sourcePath to $targetPath..."
-            Copy-Item -Path "$sourcePath\*" -Destination "$targetPath" -Recurse -Force
-            Write-Host "[SUCCESS] Files copied successfully"
+            
+            # Use absolute paths for file copy
+            $absoluteSourcePath = if ([System.IO.Path]::IsPathRooted($sourcePath)) { 
+              $sourcePath 
+            } else { 
+              Join-Path (Get-Location) $sourcePath 
+            }
+            
+            Write-Host "Using absolute source path for copy: $absoluteSourcePath"
+            
+            if (Test-Path $absoluteSourcePath) {
+              Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
+              Write-Host "[SUCCESS] Files copied successfully"
+              
+              # Verify copy
+              $copiedFiles = Get-ChildItem -Path $targetPath -Recurse -File | Measure-Object
+              Write-Host "[INFO] Copied $($copiedFiles.Count) files to target directory"
+            } else {
+              Write-Error "Source path does not exist: $absoluteSourcePath"
+              throw "Source path not found for file copy"
+            }
             
             # Start IIS services if we have admin rights
             if ($isAdmin) {
