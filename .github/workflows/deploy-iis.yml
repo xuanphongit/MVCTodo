@@ -163,9 +163,9 @@ jobs:
             
             # Common exit codes and their meanings
             switch ($LASTEXITCODE) {
-              5 { Write-Host "[INFO] Exit code 5: Configuration/Permission error - expected without admin rights" }
-              183 { Write-Host "[INFO] Exit code 183: File already exists - not critical" }
-              default { Write-Host "[INFO] Exit code $LASTEXITCODE: Will use alternative deployment methods" }
+              5 { Write-Host "[INFO] Exit code 5 - Configuration/Permission error - expected without admin rights" }
+              183 { Write-Host "[INFO] Exit code 183 - File already exists - not critical" }
+              default { Write-Host "[INFO] Exit code $LASTEXITCODE - Will use alternative deployment methods" }
             }
             
             Write-Host "[INFO] This is expected when running without Administrator privileges"
