@@ -49,8 +49,11 @@ env:
   PUBLISH_PATH: './publish'
   BACKUP_PATH: 'C:\Deployments\Backups'
   DOTNET_VERSION: '8.0.x'
-  # Environment-specific variables will be set based on input
   DEPLOYMENT_TIMEOUT: 300 # 5 minutes
+  # Azure Key Vault configuration
+  AZURE_KEY_VAULT_NAME: 'kv-phongmx'
+  CERTIFICATE_NAME: 'phongmxorg'
+  DOMAIN_NAME: 'phongmx.org'
 
 jobs:
   build-and-deploy:
@@ -59,17 +62,41 @@ jobs:
     timeout-minutes: 30
     environment: ${{ inputs.environment || 'production' }}
     
-    # Set environment variables based on deployment target
-    env:
-      IIS_SITE_NAME: ${{ inputs.environment == 'staging' && 'TodoMVCApp-Staging' || inputs.environment == 'development' && 'TodoMVCApp-Dev' || 'TodoMVCApp' }}
-      IIS_APP_POOL: ${{ inputs.environment == 'staging' && 'TodoMVCAppPool-Staging' || inputs.environment == 'development' && 'TodoMVCAppPool-Dev' || 'TodoMVCAppPool' }}
-      IIS_SITE_PATH: ${{ inputs.environment == 'staging' && 'C:\inetpub\wwwroot\TodoApp-Staging' || inputs.environment == 'development' && 'C:\inetpub\wwwroot\TodoApp-Dev' || 'C:\inetpub\wwwroot\TodoApp' }}
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0 # Get full history for better change detection
+        fetch-depth: 0
+
+    - name: Download SSL Certificate from Key Vault
+      shell: powershell
+      run: |
+        Write-Host "=== DOWNLOADING SSL CERTIFICATE FROM KEY VAULT ===" -ForegroundColor Yellow
+        
+        # Create certificate directory if it doesn't exist
+        $certDir = "${{ env.IIS_SITE_PATH }}\certificates"
+        if (!(Test-Path $certDir)) {
+          New-Item -ItemType Directory -Path $certDir -Force | Out-Null
+          Write-Host "Created certificate directory: $certDir"
+        }
+        
+        # Download certificate from Key Vault
+        $certPath = "$certDir\${{ env.CERTIFICATE_NAME }}.pfx"
+        Write-Host "Downloading certificate to: $certPath"
+        
+        # Get certificate from Key Vault using Managed Identity
+        $cert = Get-AzKeyVaultCertificate -VaultName ${{ env.AZURE_KEY_VAULT_NAME }} -Name ${{ env.CERTIFICATE_NAME }}
+        $certBytes = $cert.Certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx)
+        [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+        
+        Write-Host "[SUCCESS] Certificate downloaded successfully" -ForegroundColor Green
+        
+        # Set permissions on certificate file
+        icacls $certPath /inheritance:r
+        icacls $certPath /grant:r "IIS_IUSRS:(R)"
+        icacls $certPath /grant:r "Administrators:(F)"
+        
+        Write-Host "[SUCCESS] Certificate permissions set" -ForegroundColor Green
 
     - name: Display Environment Info
       shell: powershell
@@ -84,6 +111,8 @@ jobs:
         Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
         Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
         Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
+        Write-Host "Domain: ${{ env.DOMAIN_NAME }}"
+        Write-Host "SSL Certificate: ${{ env.CERTIFICATE_NAME }}"
         Write-Host "Skip IIS Setup: ${{ inputs.skip_iis_setup || 'false' }}"
         Write-Host "Skip Tests: ${{ inputs.skip_tests || 'false' }}"
         Write-Host "Force Deploy: ${{ inputs.force_deploy || 'false' }}"
@@ -225,7 +254,8 @@ jobs:
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $appPoolName = "${{ env.IIS_APP_POOL }}"
         $sitePath = "${{ env.IIS_SITE_PATH }}"
-        $port = 80
+        $certPath = "$sitePath\certificates\${{ env.CERTIFICATE_NAME }}.pfx"
+        $domainName = "${{ env.DOMAIN_NAME }}"
         
         # Create deployment directory if it doesn't exist
         if (!(Test-Path $sitePath)) {
@@ -282,59 +312,6 @@ jobs:
           } catch {
             Write-Warning "[WARNING] appcmd method failed: $($_.Exception.Message)"
           }
-        } else {
-          Write-Host "[INFO] Skipping appcmd operations - requires Administrator privileges"
-        }
-        
-        # Method 2: Fallback to PowerShell WebAdministration (works with limited privileges)
-        if (!$appPoolManaged) {
-          try {
-            Write-Host "Trying PowerShell WebAdministration module..."
-            Import-Module WebAdministration -Force -ErrorAction Stop
-            
-            if (!(Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue)) {
-              if ($isAdmin) {
-                New-WebAppPool -Name $appPoolName -Force
-                Write-Host "[SUCCESS] Application pool created with PowerShell"
-              } else {
-                Write-Warning "[WARNING] Cannot create application pool without admin privileges"
-                Write-Host "[INFO] Please create application pool '$appPoolName' manually in IIS Manager"
-              }
-            } else {
-              Write-Host "[INFO] Application pool '$appPoolName' already exists"
-            }
-            
-            # Try to configure app pool (some settings may fail without admin)
-            try {
-              Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name processModel.identityType -Value ApplicationPoolIdentity -ErrorAction SilentlyContinue
-              Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name managedRuntimeVersion -Value "" -ErrorAction SilentlyContinue
-              Write-Host "[INFO] Application pool configuration attempted"
-            } catch {
-              Write-Warning "[WARNING] Some application pool settings could not be configured: $($_.Exception.Message)"
-            }
-            
-            # Stop app pool
-            try {
-              Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
-              Start-Sleep -Seconds 2
-              Write-Host "[SUCCESS] Application pool stopped"
-            } catch {
-              Write-Warning "[WARNING] Could not stop application pool: $($_.Exception.Message)"
-            }
-            
-            Write-Host "[SUCCESS] Application pool managed with PowerShell"
-            $appPoolManaged = $true
-            
-          } catch {
-            Write-Warning "[WARNING] PowerShell WebAdministration failed: $($_.Exception.Message)"
-            Write-Host "[INFO] Application pool management will be skipped"
-            Write-Host "[INFO] Please ensure application pool '$appPoolName' exists in IIS Manager"
-          }
-        }
-        
-        if (!$appPoolManaged) {
-          Write-Host "[INFO] Application pool management was skipped due to insufficient privileges"
-          Write-Host "[INFO] Deployment will continue - manual IIS configuration may be required"
         }
         
         # === WEBSITE MANAGEMENT ===
@@ -359,9 +336,9 @@ jobs:
           }
           
           if (!$siteExists) {
-            # Create new website
-            Write-Host "Creating website: $siteName"
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:$siteName /bindings:http/*:${port}: /physicalPath:$sitePath
+            # Create new website with SSL binding
+            Write-Host "Creating website: $siteName with SSL binding"
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:$siteName /bindings:"https/*:443:$domainName" /physicalPath:$sitePath
             if ($LASTEXITCODE -eq 0) {
               Write-Host "[SUCCESS] Website created successfully"
             } else {
@@ -371,12 +348,16 @@ jobs:
             # Update existing website
             Write-Host "Updating website configuration..."
             & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site $siteName /[path='/'].physicalPath:$sitePath
-            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site $siteName /bindings:http/*:${port}:
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site $siteName /bindings:"https/*:443:$domainName"
           }
           
           # Set application pool for website
           Write-Host "Assigning application pool to website..."
           & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set app "${siteName}/" /applicationPool:$appPoolName
+          
+          # Configure SSL certificate
+          Write-Host "Configuring SSL certificate..."
+          & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set site $siteName /bindings:"https/*:443:$domainName" /certificateHash:$certPath
           
           Write-Host "[SUCCESS] Website configured with appcmd"
           
@@ -389,7 +370,7 @@ jobs:
             Import-Module WebAdministration -Force
             
             if (!(Get-Website -Name $siteName -ErrorAction SilentlyContinue)) {
-              New-Website -Name $siteName -PhysicalPath $sitePath -Port $port -ApplicationPool $appPoolName
+              New-Website -Name $siteName -PhysicalPath $sitePath -Port 443 -HostHeader $domainName -Ssl -ApplicationPool $appPoolName
               Write-Host "[SUCCESS] Website created with PowerShell"
             } else {
               # Update existing website
