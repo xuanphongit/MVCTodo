@@ -54,13 +54,24 @@ env:
   AZURE_KEY_VAULT_NAME: 'kv-phongmx'
   CERTIFICATE_NAME: 'phongmxorg'
   DOMAIN_NAME: 'phongmx.org'
+  # IIS Configuration
+  IIS_SITE_NAME: 'TodoApp'
+  IIS_APP_POOL: 'TodoAppPool'
+  IIS_SITE_PATH: 'C:\inetpub\wwwroot\TodoApp'
 
 jobs:
   build-and-deploy:
     name: Build and Deploy to IIS
-    runs-on: [self-hosted, new-self-host]
+    runs-on: [self-hosted]
     timeout-minutes: 30
     environment: ${{ inputs.environment || 'production' }}
+
+    env:
+      IIS_SITE_NAME: ${{ inputs.environment == 'staging' && 'TodoMVCApp-Staging' || inputs.environment == 'development' && 'TodoMVCApp-Dev' || 'TodoMVCApp' }}
+      IIS_APP_POOL: ${{ inputs.environment == 'staging' && 'TodoMVCAppPool-Staging' || inputs.environment == 'development' && 'TodoMVCAppPool-Dev' || 'TodoMVCAppPool' }}
+      IIS_SITE_PATH: ${{ inputs.environment == 'staging' && 'C:\inetpub\wwwroot\TodoApp-Staging' || inputs.environment == 'development' && 'C:\inetpub\wwwroot\TodoApp-Dev' || 'C:\inetpub\wwwroot\TodoApp' }}
+      BACKUP_PATH: 'C:\Deployments\Backups'
+    
     
     steps:
     - name: Checkout code
