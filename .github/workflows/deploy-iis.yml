@@ -79,8 +79,7 @@ jobs:
       with:
         fetch-depth: 0
 
-   
-
+  
     - name: Download SSL Certificate from Key Vault
       shell: powershell
       run: |
