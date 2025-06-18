@@ -79,6 +79,14 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Install Azure PowerShell Modules
+      shell: powershell
+      run: |
+        Write-Host "=== INSTALLING AZURE POWERSHELL MODULES ===" -ForegroundColor Yellow
+        Install-Module -Name Az -Force -AllowClobber -Scope CurrentUser
+        Import-Module Az
+        Write-Host "[SUCCESS] Azure PowerShell modules installed" -ForegroundColor Green
+
     - name: Download SSL Certificate from Key Vault
       shell: powershell
       run: |
