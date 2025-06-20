@@ -253,9 +253,11 @@ jobs:
           
           # Convert relative paths to absolute paths for Web Deploy
           $absoluteSourcePath = Resolve-Path "${{ env.PUBLISH_PATH }}" | Select-Object -ExpandProperty Path
-          $absolutePackagePath = Join-Path (Get-Location) "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+          $packageDir = Resolve-Path "${{ env.PACKAGE_PATH }}" | Select-Object -ExpandProperty Path
+          $absolutePackagePath = Join-Path $packageDir "TodoApp.zip"
           
           Write-Host "Source path: $absoluteSourcePath"
+          Write-Host "Package directory: $packageDir"
           Write-Host "Package path: $absolutePackagePath"
           
           # Create package without parameter validation during creation
@@ -423,7 +425,8 @@ jobs:
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $sourcePath = "${{ env.PUBLISH_PATH }}"
         $targetPath = "${{ env.IIS_SITE_PATH }}"
-        $packagePath = Join-Path (Get-Location) "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+        $packageDir = if (Test-Path "${{ env.PACKAGE_PATH }}") { Resolve-Path "${{ env.PACKAGE_PATH }}" | Select-Object -ExpandProperty Path } else { "${{ env.PACKAGE_PATH }}" }
+        $packagePath = Join-Path $packageDir "TodoApp.zip"
         $method = "${{ inputs.web_deploy_method || 'auto' }}"
         $environment = "${{ inputs.environment || 'production' }}"
         $setParamFile = "parameters/setParameters.$environment.xml"
