@@ -248,10 +248,14 @@ jobs:
         try {
           Write-Host "Creating Web Deploy package..."
           
+          # Convert relative path to absolute path for Web Deploy
+          $absoluteSourcePath = Resolve-Path "${{ env.PUBLISH_PATH }}" | Select-Object -ExpandProperty Path
+          
           & "$msdeployPath" `
             -verb:sync `
-            -source:contentPath="${{ env.PUBLISH_PATH }}" `
+            -source:contentPath="$absoluteSourcePath" `
             -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
+            -declareParamFile:"parameters/setParameters.xml" `
             -verbose
             
           if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
