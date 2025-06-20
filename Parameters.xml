@@ -21,9 +21,9 @@
   <parameter name="DefaultConnection" 
              description="Default database connection string"
              defaultValue="">
-    <parameterEntry kind="XmlFile" 
+    <parameterEntry kind="TextFile" 
                     scope="\\appsettings\.json$" 
-                    match="/configuration/connectionStrings/add[@name='DefaultConnection']/@connectionString" />
+                    match="{{CONNECTION_PLACEHOLDER}}" />
   </parameter>
 
   <!-- IIS Application settings -->
@@ -39,9 +39,9 @@
   <parameter name="ASPNETCORE-ENVIRONMENT" 
              description="ASP.NET Core environment"
              defaultValue="Production">
-    <parameterEntry kind="XmlFile" 
+    <parameterEntry kind="TextFile" 
                     scope="\\web\.config$" 
-                    match="/configuration/system.webServer/aspNetCore/@environment" />
+                    match="{{ASPNETCORE_ENVIRONMENT_PLACEHOLDER}}" />
   </parameter>
 
   <!-- Logging level parameter -->
@@ -76,7 +76,7 @@
              description="Domain for HTTPS binding"
              defaultValue="phongmx.org">
     <parameterEntry kind="TextFile" 
-                    scope="\\web\.config$" 
+                    scope="\\appsettings\.json$" 
                     match="{{HTTPS_DOMAIN_PLACEHOLDER}}" />
   </parameter>
 </parameters> 

@@ -251,11 +251,14 @@ jobs:
           # Convert relative path to absolute path for Web Deploy
           $absoluteSourcePath = Resolve-Path "${{ env.PUBLISH_PATH }}" | Select-Object -ExpandProperty Path
           
+          # Create package without parameter validation during creation
           & "$msdeployPath" `
             -verb:sync `
             -source:contentPath="$absoluteSourcePath" `
             -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
-            -declareParamFile:"parameters/setParameters.xml" `
+            -disableLink:AppPoolExtension `
+            -disableLink:ContentExtension `
+            -disableLink:CertificateExtension `
             -verbose
             
           if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
@@ -268,6 +271,7 @@ jobs:
           }
         } catch {
           Write-Warning "Package creation failed: $($_.Exception.Message)"
+          Write-Host "Continuing with folder-based deployment as fallback"
         }
 
     # ================================
@@ -414,6 +418,16 @@ jobs:
         $targetPath = "${{ env.IIS_SITE_PATH }}"
         $packagePath = "${{ env.PACKAGE_PATH }}\TodoApp.zip"
         $method = "${{ inputs.web_deploy_method || 'auto' }}"
+        $environment = "${{ inputs.environment || 'production' }}"
+        $setParamFile = "parameters/setParameters.$environment.xml"
+        
+        # Check if environment-specific parameter file exists, fallback to default
+        if (!(Test-Path $setParamFile)) {
+          $setParamFile = "parameters/setParameters.xml"
+          Write-Warning "Environment-specific parameter file not found, using default: $setParamFile"
+        } else {
+          Write-Host "Using environment-specific parameter file: $setParamFile"
+        }
         
         # Verify source and target directories
         if (!(Test-Path $sourcePath)) {
@@ -434,7 +448,7 @@ jobs:
             -verb:sync `
             -source:package="$absolutePackagePath" `
             -dest:iisApp="$siteName",computerName=localhost `
-            -setParamFile:"parameters/setParameters.xml" `
+            -setParamFile:"$setParamFile" `
             -enableRule:AppOffline `
             -enableRule:DoNotDeleteRule `
             -allowUntrusted:true `
