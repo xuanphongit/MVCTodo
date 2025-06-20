@@ -1,9 +1,6 @@
 name: Deploy to IIS using Web Deploy
 
 on:
-  push:
-    branches:
-      - master
   workflow_dispatch:
     inputs:
       environment:
@@ -129,8 +126,16 @@ jobs:
         }
         
         # Check disk space (minimum 1GB free)
-        $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'"
-        $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
+        try {
+          $drive = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'" -ErrorAction SilentlyContinue
+          if (-not $drive) {
+            $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'" -ErrorAction SilentlyContinue
+          }
+          $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
+        } catch {
+          Write-Warning "Could not check disk space: $($_.Exception.Message)"
+          $freeSpaceGB = 999 # Assume sufficient space if check fails
+        }
         if ($freeSpaceGB -gt 1) {
           Write-Host "[OK] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
         } else {
@@ -319,40 +324,192 @@ jobs:
           Write-Warning "Could not set all permissions: $($_.Exception.Message)"
         }
 
-        # Create Application Pool using Web Deploy
-        Write-Host "Creating/Configuring Application Pool: $appPoolName"
-        & "$msdeployPath" `
-          -verb:sync `
-          -source:appPool `
-          -dest:appPool="$appPoolName",managedRuntimeVersion="",enable32BitAppOnWin64=false,processModel.identityType=ApplicationPoolIdentity `
-          -verbose
-        if ($LASTEXITCODE -ne 0) {
-          Write-Warning "[WARNING] Application pool operation completed with warnings (exit code: $LASTEXITCODE)"
-        } else {
-          Write-Host "[SUCCESS] Application pool created/configured with Web Deploy"
+        # Import required modules for IIS management
+        Import-Module WebAdministration -ErrorAction Stop
+        
+        Write-Host "=== IIS WEB APP MANAGEMENT (Azure DevOps Style) ===" -ForegroundColor Cyan
+        
+        # IIS Application Pool Management
+        Write-Host "Managing Application Pool: $appPoolName" -ForegroundColor Yellow
+        try {
+          $appPoolExists = Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+          
+          if ($appPoolExists) {
+            Write-Host "Application Pool '$appPoolName' exists. Stopping for reconfiguration..."
+            Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+            
+            # Wait for pool to stop
+            $timeout = 30
+            $elapsed = 0
+            while ((Get-WebAppPool -Name $appPoolName).State -ne "Stopped" -and $elapsed -lt $timeout) {
+              Start-Sleep -Seconds 1
+              $elapsed++
+            }
+            if ($elapsed -ge $timeout) {
+              Write-Warning "Application pool '$appPoolName' did not stop within $timeout seconds. Current state: $((Get-WebAppPool -Name $appPoolName).State)"
+            }
+          } else {
+            Write-Host "Creating new Application Pool: $appPoolName"
+            New-WebAppPool -Name $appPoolName
+          }
+          
+          # Configure Application Pool (Azure DevOps style settings)
+          Write-Host "Configuring Application Pool settings..."
+          
+          # .NET Core settings
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "managedRuntimeVersion" -Value ""
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "enable32BitAppOnWin64" -Value $false
+          
+          # Process Model settings
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.identityType" -Value "ApplicationPoolIdentity"
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.loadUserProfile" -Value $true
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.idleTimeout" -Value "00:00:00"
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.maxProcesses" -Value 1
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingingEnabled" -Value $true
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingInterval" -Value "00:00:30"
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingResponseTime" -Value "00:01:30"
+          
+          # Recycling settings
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "recycling.periodicRestart.time" -Value "00:00:00"
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "recycling.periodicRestart.schedule" -Value @()
+          
+          # Failure settings
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtection" -Value $true
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtectionInterval" -Value "00:05:00"
+          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtectionMaxCrashes" -Value 5
+          
+          # Start the application pool
+          Start-WebAppPool -Name $appPoolName
+          Write-Host "[SUCCESS] Application Pool '$appPoolName' configured and started" -ForegroundColor Green
+          
+        } catch {
+          Write-Error "Application Pool management failed: $($_.Exception.Message)"
+          throw
         }
 
-        # Create IIS Website using Web Deploy
-        Write-Host "Creating/Configuring IIS Website: $siteName"
-        & "$msdeployPath" `
-          -verb:sync `
-          -source:appHostConfig="Default Web Site" `
-          -dest:appHostConfig="$siteName",computerName=localhost `
-          -enableRule:AppOffline `
-          -verbose
+        # IIS Website Management
+        Write-Host "Managing IIS Website: $siteName" -ForegroundColor Yellow
+        try {
+          $websiteExists = Get-Website -Name $siteName -ErrorAction SilentlyContinue
           
-        # Configure site bindings and path
-        & "$msdeployPath" `
-          -verb:sync `
-          -source:iisApp `
-          -dest:iisApp="$siteName",computerName=localhost,physicalPath="$sitePath",applicationPool="$appPoolName" `
-          -enableRule:AppOffline `
-          -verbose
+          if ($websiteExists) {
+            Write-Host "Website '$siteName' exists. Stopping for reconfiguration..."
+            Stop-Website -Name $siteName -ErrorAction SilentlyContinue
+            
+            # Wait for site to stop
+            $timeout = 30
+            $elapsed = 0
+            while ((Get-Website -Name $siteName).State -ne "Stopped" -and $elapsed -lt $timeout) {
+              Start-Sleep -Seconds 1
+              $elapsed++
+            }
+            if ($elapsed -ge $timeout) {
+              Write-Warning "Website '$siteName' did not stop within $timeout seconds. Current state: $((Get-Website -Name $siteName).State)"
+            }
+            
+            # Remove existing bindings
+            Write-Host "Removing existing bindings..."
+            Get-WebBinding -Name $siteName | Remove-WebBinding
+            
+            # Update website configuration
+            Write-Host "Updating website configuration..."
+            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "physicalPath" -Value $sitePath
+            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "applicationPool" -Value $appPoolName
+            
+          } else {
+            Write-Host "Creating new Website: $siteName"
+            New-Website -Name $siteName -PhysicalPath $sitePath -ApplicationPool $appPoolName
+          }
           
-        if ($LASTEXITCODE -ne 0) {
-          Write-Warning "[WARNING] Website operation completed with warnings (exit code: $LASTEXITCODE)"
-        } else {
-          Write-Host "[SUCCESS] IIS Website created/configured with Web Deploy"
+          # Configure Website Bindings (Azure DevOps style)
+          Write-Host "Configuring website bindings..."
+          
+          # HTTP Binding (Port 80)
+          if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -ErrorAction SilentlyContinue)) {
+            Write-Host "Adding HTTP binding (Port 80)..."
+            New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http"
+          }
+          
+          # Additional environment-specific bindings
+          $environment = "${{ inputs.environment || 'production' }}"
+          if ($environment -eq "production") {
+            # Production: Add domain-specific HTTP binding
+            if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "phongmx.org" -ErrorAction SilentlyContinue)) {
+              Write-Host "Adding production HTTP binding for phongmx.org..."
+              New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "phongmx.org"
+            }
+          } elseif ($environment -eq "staging") {
+            # Staging: Add staging subdomain binding
+            if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org" -ErrorAction SilentlyContinue)) {
+              Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
+              New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org"
+            }
+          }
+          
+          # Website configuration
+          Write-Host "Applying website configuration..."
+          Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "serverAutoStart" -Value $true
+          Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "preloadEnabled" -Value $false
+          
+          # Start the website
+          Start-Website -Name $siteName
+          Write-Host "[SUCCESS] Website '$siteName' configured and started" -ForegroundColor Green
+          
+        } catch {
+          Write-Error "Website management failed: $($_.Exception.Message)"
+          throw
+        }
+        
+        # Virtual Directory and Application Management (Azure DevOps style)
+        Write-Host "Configuring Virtual Applications..." -ForegroundColor Yellow
+        try {
+          # Ensure the main application is properly configured
+          $appPath = "/"
+          $virtualApp = Get-WebApplication -Site $siteName -Name "" -ErrorAction SilentlyContinue
+          
+          if ($virtualApp) {
+            Write-Host "Updating main application configuration..."
+            Set-ItemProperty -Path "IIS:\Sites\$siteName\$appPath" -Name "physicalPath" -Value $sitePath
+            Set-ItemProperty -Path "IIS:\Sites\$siteName\$appPath" -Name "applicationPool" -Value $appPoolName
+          }
+          
+          Write-Host "[SUCCESS] Virtual application configuration completed" -ForegroundColor Green
+          
+        } catch {
+          Write-Warning "Virtual application configuration warning: $($_.Exception.Message)"
+        }
+        
+        # Display final configuration summary (Azure DevOps style)
+        Write-Host "=== IIS CONFIGURATION SUMMARY ===" -ForegroundColor Cyan
+        try {
+          $appPool = Get-WebAppPool -Name $appPoolName
+          $website = Get-Website -Name $siteName
+          $bindings = Get-WebBinding -Name $siteName
+          
+          Write-Host "Application Pool Details:" -ForegroundColor White
+          Write-Host "  Name: $($appPool.Name)"
+          Write-Host "  State: $($appPool.State)"
+          Write-Host "  .NET Version: $($appPool.managedRuntimeVersion)"
+          Write-Host "  Identity: $($appPool.processModel.identityType)"
+          
+          Write-Host "Website Details:" -ForegroundColor White
+          Write-Host "  Name: $($website.Name)"
+          Write-Host "  State: $($website.State)"
+          Write-Host "  Physical Path: $($website.physicalPath)"
+          Write-Host "  Application Pool: $($website.applicationPool)"
+          
+          Write-Host "Bindings:" -ForegroundColor White
+          foreach ($binding in $bindings) {
+            $hostHeader = if ($binding.bindingInformation.Contains(":")) { 
+              $binding.bindingInformation.Split(":")[-1] 
+            } else { 
+              "*" 
+            }
+            Write-Host "  $($binding.protocol)://$hostHeader`:$($binding.bindingInformation.Split(":")[-2])"
+          }
+          
+        } catch {
+          Write-Warning "Could not retrieve configuration summary: $($_.Exception.Message)"
         }
         
         Write-Host "[SUCCESS] IIS Site management completed"
@@ -364,7 +521,8 @@ jobs:
         
         $pfxPath = ".\.github\workflows\key\origin.pfx"
         $pfxPassword = $env:PFX_PASSWORD
-        $hostname = "phongmx.org"
+        $environment = "${{ inputs.environment || 'production' }}"
+        $hostname = if ($environment -eq "staging") { "staging.phongmx.org" } elseif ($environment -eq "development") { "dev.phongmx.org" } else { "phongmx.org" }
         $siteName = "${{ env.IIS_SITE_NAME }}"
         
         if (-not (Test-Path $pfxPath)) {
@@ -545,11 +703,23 @@ jobs:
         $maxAttempts = 12
         $delaySeconds = 10
         
-        # Determine health check URL
-        $healthCheckUrls = @(
-          "https://phongmx.org",
-          "http://localhost"
-        )
+        # Determine health check URL based on environment
+        $environment = "${{ inputs.environment || 'production' }}"
+        $healthCheckUrls = @()
+        
+        if ($environment -eq "production") {
+          $healthCheckUrls += "https://phongmx.org"
+          $healthCheckUrls += "http://phongmx.org"
+        } elseif ($environment -eq "staging") {
+          $healthCheckUrls += "https://staging.phongmx.org"
+          $healthCheckUrls += "http://staging.phongmx.org"
+        } elseif ($environment -eq "development") {
+          $healthCheckUrls += "https://dev.phongmx.org"
+          $healthCheckUrls += "http://dev.phongmx.org"
+        }
+        
+        # Add localhost as fallback
+        $healthCheckUrls += "http://localhost"
         
         Write-Host "Health check URLs: $($healthCheckUrls -join ', ')"
         Write-Host "Max attempts: $maxAttempts, Delay: ${delaySeconds}s"
@@ -718,4 +888,4 @@ jobs:
           }
         } else {
           Write-Host "No webhook configured - skipping notification"
-        } 
+        }
