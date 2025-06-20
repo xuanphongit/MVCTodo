@@ -248,21 +248,25 @@ jobs:
         try {
           Write-Host "Creating Web Deploy package..."
           
-          # Convert relative path to absolute path for Web Deploy
+          # Convert relative paths to absolute paths for Web Deploy
           $absoluteSourcePath = Resolve-Path "${{ env.PUBLISH_PATH }}" | Select-Object -ExpandProperty Path
+          $absolutePackagePath = Join-Path (Get-Location) "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+          
+          Write-Host "Source path: $absoluteSourcePath"
+          Write-Host "Package path: $absolutePackagePath"
           
           # Create package without parameter validation during creation
           & "$msdeployPath" `
             -verb:sync `
             -source:contentPath="$absoluteSourcePath" `
-            -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
+            -dest:package="$absolutePackagePath" `
             -disableLink:AppPoolExtension `
             -disableLink:ContentExtension `
             -disableLink:CertificateExtension `
             -verbose
             
-          if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
-            $packageInfo = Get-Item "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+          if ($LASTEXITCODE -eq 0 -and (Test-Path "$absolutePackagePath")) {
+            $packageInfo = Get-Item "$absolutePackagePath"
             Write-Host "[SUCCESS] Web Deploy package created successfully" -ForegroundColor Green
             Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
             Write-Host "Package location: $($packageInfo.FullName)"
@@ -416,7 +420,7 @@ jobs:
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $sourcePath = "${{ env.PUBLISH_PATH }}"
         $targetPath = "${{ env.IIS_SITE_PATH }}"
-        $packagePath = "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+        $packagePath = Join-Path (Get-Location) "${{ env.PACKAGE_PATH }}\TodoApp.zip"
         $method = "${{ inputs.web_deploy_method || 'auto' }}"
         $environment = "${{ inputs.environment || 'production' }}"
         $setParamFile = "parameters/setParameters.$environment.xml"
