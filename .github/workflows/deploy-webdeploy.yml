@@ -52,9 +52,7 @@ jobs:
       IIS_APP_POOL: ${{ inputs.environment == 'staging' && 'TodoMVCAppPool-Staging' || inputs.environment == 'development' && 'TodoMVCAppPool-Dev' || 'TodoMVCAppPool' }}
       IIS_SITE_PATH: ${{ inputs.environment == 'staging' && 'C:\inetpub\wwwroot\TodoApp-Staging' || inputs.environment == 'development' && 'C:\inetpub\wwwroot\TodoApp-Dev' || 'C:\inetpub\wwwroot\TodoApp' }}
       BACKUP_PATH: 'C:\Deployments\Backups'
-      WEB_DEPLOY_SERVER: ${{ secrets.WEB_DEPLOY_SERVER || 'localhost' }}
-      WEB_DEPLOY_USERNAME: ${{ secrets.WEB_DEPLOY_USERNAME }}
-      WEB_DEPLOY_PASSWORD: ${{ secrets.WEB_DEPLOY_PASSWORD }}
+      PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
     
     steps:
     - name: Checkout code
@@ -88,44 +86,25 @@ jobs:
       run: |
         Write-Host "=== VALIDATING PREREQUISITES ===" -ForegroundColor Yellow
         
-        $errors = @()
-        
         # Check if running as Administrator
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        if ($isAdmin) {
-          Write-Host "[OK] Running as Administrator" -ForegroundColor Green
-        } else {
-          $errors += "Not running as Administrator - some operations may fail"
-          Write-Warning "[WARNING] Not running as Administrator"
+        if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+          Write-Error "This workflow must be run as Administrator."
+          throw "Not running as Administrator"
         }
+        Write-Host "[OK] Running as Administrator" -ForegroundColor Green
         
         # Check Web Deploy installation
-        $webDeployPaths = @(
-          "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe",
-          "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-        )
-        
-        $msdeployPath = $null
-        foreach ($path in $webDeployPaths) {
-          if (Test-Path $path) {
-            $msdeployPath = $path
-            Write-Host "[OK] Web Deploy V3 found at: $path" -ForegroundColor Green
-            break
-          }
+        $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+        if (-not (Test-Path $msdeployPath)) {
+          $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
         }
-        
-        if (!$msdeployPath) {
-          $errors += "Web Deploy V3 not found - please install it"
-          Write-Error "[ERROR] Web Deploy V3 not found!"
-        } else {
-          # Get and validate Web Deploy version
-          try {
-            $version = & "$msdeployPath" -version 2>&1 | Select-String "Microsoft Web Deploy" | Select-Object -First 1
-            Write-Host "[OK] $version" -ForegroundColor Green
+
+        if (Test-Path $msdeployPath) {
+            Write-Host "[OK] Web Deploy V3 found at: $msdeployPath" -ForegroundColor Green
             $env:MSDEPLOY_PATH = $msdeployPath
-          } catch {
-            Write-Warning "[WARNING] Could not get Web Deploy version: $($_.Exception.Message)"
-          }
+        } else {
+            Write-Error "[ERROR] Web Deploy V3 not found!"
+            throw "Web Deploy V3 not found"
         }
         
         # Check .NET SDK
@@ -133,49 +112,29 @@ jobs:
           $dotnetVersion = dotnet --version
           Write-Host "[OK] .NET SDK Version: $dotnetVersion" -ForegroundColor Green
         } catch {
-          $errors += ".NET SDK not found - please install .NET ${{ env.DOTNET_VERSION }} SDK"
           Write-Error "[ERROR] .NET SDK not found"
+          throw ".NET SDK not found - please install .NET ${{ env.DOTNET_VERSION }} SDK"
         }
         
         # Check IIS installation
-        try {
-          $iisService = Get-Service W3SVC -ErrorAction SilentlyContinue
-          if ($iisService) {
-            Write-Host "[OK] IIS Service Status: $($iisService.Status)" -ForegroundColor Green
-          } else {
-            $errors += "IIS service not found - please install IIS"
-            Write-Error "[ERROR] IIS service not found"
-          }
-        } catch {
-          Write-Warning "[WARNING] Could not check IIS service: $($_.Exception.Message)"
+        $iisService = Get-Service W3SVC -ErrorAction SilentlyContinue
+        if ($iisService) {
+          Write-Host "[OK] IIS Service Status: $($iisService.Status)" -ForegroundColor Green
+        } else {
+          Write-Error "[ERROR] IIS service not found"
+          throw "IIS service not found - please install IIS"
         }
         
         # Check disk space (minimum 1GB free)
-        try {
-          $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'"
-          $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
-          if ($freeSpaceGB -gt 1) {
-            Write-Host "[OK] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
-          } else {
-            $errors += "Insufficient disk space (${freeSpaceGB}GB available, minimum 1GB required)"
-            Write-Warning "[WARNING] Low disk space: ${freeSpaceGB}GB"
-          }
-        } catch {
-          Write-Warning "[WARNING] Could not check disk space: $($_.Exception.Message)"
+        $drive = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'"
+        $freeSpaceGB = [math]::Round($drive.FreeSpace / 1GB, 2)
+        if ($freeSpaceGB -gt 1) {
+          Write-Host "[OK] Available disk space: ${freeSpaceGB}GB" -ForegroundColor Green
+        } else {
+          Write-Warning "[WARNING] Low disk space: ${freeSpaceGB}GB (minimum 1GB recommended)"
         }
         
-        # Summary
-        if ($errors.Count -eq 0) {
-          Write-Host "[SUCCESS] All prerequisites validated successfully" -ForegroundColor Green
-        } else {
-          Write-Host "[WARNING] Prerequisites validation completed with warnings:" -ForegroundColor Yellow
-          foreach ($error in $errors) {
-            Write-Host "  - $error" -ForegroundColor Yellow
-          }
-          Write-Host ""
-          Write-Host "Deployment will continue but may encounter issues." -ForegroundColor Yellow
-          Write-Host "For best results, please resolve the above warnings." -ForegroundColor Yellow
-        }
+        Write-Host "[SUCCESS] All prerequisites validated successfully" -ForegroundColor Green
 
     - name: Cache NuGet packages
       uses: actions/cache@v4
@@ -189,40 +148,26 @@ jobs:
       shell: powershell
       run: |
         Write-Host "=== RESTORING DEPENDENCIES ===" -ForegroundColor Yellow
-        
-        try {
-          dotnet restore ${{ env.PROJECT_PATH }} --verbosity minimal
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] Package restore completed successfully" -ForegroundColor Green
-          } else {
-            throw "Package restore failed with exit code: $LASTEXITCODE"
-          }
-        } catch {
-          Write-Error "Package restore failed: $($_.Exception.Message)"
-          throw
+        dotnet restore ${{ env.PROJECT_PATH }} --verbosity minimal
+        if ($LASTEXITCODE -ne 0) {
+          throw "Package restore failed with exit code: $LASTEXITCODE"
         }
+        Write-Host "[SUCCESS] Package restore completed successfully" -ForegroundColor Green
 
     - name: Build application
       shell: powershell
       run: |
         Write-Host "=== BUILDING APPLICATION ===" -ForegroundColor Yellow
-        
-        try {
-          dotnet build ${{ env.PROJECT_PATH }} `
-            --configuration Release `
-            --no-restore `
-            --verbosity minimal `
-            --property:PublishUrl=${{ env.IIS_SITE_PATH }}
+        dotnet build ${{ env.PROJECT_PATH }} `
+          --configuration Release `
+          --no-restore `
+          --verbosity minimal `
+          --property:PublishUrl=${{ env.IIS_SITE_PATH }}
             
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] Build completed successfully" -ForegroundColor Green
-          } else {
-            throw "Build failed with exit code: $LASTEXITCODE"
-          }
-        } catch {
-          Write-Error "Build failed: $($_.Exception.Message)"
-          throw
+        if ($LASTEXITCODE -ne 0) {
+          throw "Build failed with exit code: $LASTEXITCODE"
         }
+        Write-Host "[SUCCESS] Build completed successfully" -ForegroundColor Green
 
     - name: Run tests
       if: ${{ inputs.skip_tests != 'true' }}
@@ -232,25 +177,18 @@ jobs:
         
         $testProjects = Get-ChildItem -Recurse -Filter "*Test*.csproj" -File
         if ($testProjects.Count -gt 0) {
-          try {
-            Write-Host "Found $($testProjects.Count) test project(s)"
-            dotnet test --configuration Release --no-build --verbosity minimal --logger trx
-            
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] All tests passed" -ForegroundColor Green
-            } else {
-              Write-Error "Tests failed with exit code: $LASTEXITCODE"
-              if ("${{ inputs.force_deploy }}" -ne "true") {
-                throw "Tests failed - deployment aborted"
-              } else {
-                Write-Warning "Tests failed but force_deploy is enabled - continuing with deployment"
-              }
-            }
-          } catch {
-            Write-Error "Test execution failed: $($_.Exception.Message)"
+          Write-Host "Found $($testProjects.Count) test project(s)"
+          dotnet test --configuration Release --no-build --verbosity minimal --logger trx
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Tests failed with exit code: $LASTEXITCODE"
             if ("${{ inputs.force_deploy }}" -ne "true") {
-              throw
+              throw "Tests failed - deployment aborted"
+            } else {
+              Write-Warning "Tests failed but force_deploy is enabled - continuing with deployment"
             }
+          } else {
+            Write-Host "[SUCCESS] All tests passed" -ForegroundColor Green
           }
         } else {
           Write-Host "[INFO] No test projects found, skipping tests" -ForegroundColor Cyan
@@ -269,34 +207,28 @@ jobs:
           }
         }
         
-        try {
-          # Publish application
-          dotnet publish ${{ env.PROJECT_PATH }} `
-            --configuration Release `
-            --no-build `
-            --output ${{ env.PUBLISH_PATH }} `
-            --self-contained false `
-            --verbosity minimal `
-            --property:PublishUrl=${{ env.IIS_SITE_PATH }}
+        # Publish application
+        dotnet publish ${{ env.PROJECT_PATH }} `
+          --configuration Release `
+          --no-build `
+          --output ${{ env.PUBLISH_PATH }} `
+          --self-contained false `
+          --verbosity minimal `
+          --property:PublishUrl=${{ env.IIS_SITE_PATH }}
             
-          if ($LASTEXITCODE -ne 0) {
-            throw "Publish failed with exit code: $LASTEXITCODE"
-          }
+        if ($LASTEXITCODE -ne 0) {
+          throw "Publish failed with exit code: $LASTEXITCODE"
+        }
           
-          # Verify publish output
-          if (Test-Path ${{ env.PUBLISH_PATH }}) {
-            $publishedFiles = Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse -File
-            $totalSize = ($publishedFiles | Measure-Object -Property Length -Sum).Sum
-            Write-Host "[SUCCESS] Application published successfully" -ForegroundColor Green
-            Write-Host "Published files: $($publishedFiles.Count)"
-            Write-Host "Total size: $([math]::Round($totalSize / 1MB, 2)) MB"
-          } else {
-            throw "Publish directory not found after publish operation"
-          }
-          
-        } catch {
-          Write-Error "Publish failed: $($_.Exception.Message)"
-          throw
+        # Verify publish output
+        if (Test-Path ${{ env.PUBLISH_PATH }}) {
+          $publishedFiles = Get-ChildItem -Path ${{ env.PUBLISH_PATH }} -Recurse -File
+          $totalSize = ($publishedFiles | Measure-Object -Property Length -Sum).Sum
+          Write-Host "[SUCCESS] Application published successfully" -ForegroundColor Green
+          Write-Host "Published files: $($publishedFiles.Count)"
+          Write-Host "Total size: $([math]::Round($totalSize / 1MB, 2)) MB"
+        } else {
+          throw "Publish directory not found after publish operation"
         }
 
     - name: Create Web Deploy package
@@ -305,8 +237,6 @@ jobs:
         Write-Host "=== CREATING WEB DEPLOY PACKAGE ===" -ForegroundColor Yellow
         
         $msdeployPath = $env:MSDEPLOY_PATH
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        
         if (!$msdeployPath) {
           Write-Warning "MSDeploy path not set - skipping package creation"
           exit 0
@@ -315,29 +245,25 @@ jobs:
         # Create package directory
         New-Item -ItemType Directory -Path ${{ env.PACKAGE_PATH }} -Force | Out-Null
         
-        if ($isAdmin) {
-          try {
-            Write-Host "Creating Web Deploy package..."
+        try {
+          Write-Host "Creating Web Deploy package..."
+          
+          & "$msdeployPath" `
+            -verb:sync `
+            -source:contentPath="${{ env.PUBLISH_PATH }}" `
+            -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
+            -verbose
             
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:contentPath="${{ env.PUBLISH_PATH }}" `
-              -dest:package="${{ env.PACKAGE_PATH }}\TodoApp.zip" `
-              -verbose
-              
-            if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
-              $packageInfo = Get-Item "${{ env.PACKAGE_PATH }}\TodoApp.zip"
-              Write-Host "[SUCCESS] Web Deploy package created successfully" -ForegroundColor Green
-              Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
-              Write-Host "Package location: $($packageInfo.FullName)"
-            } else {
-              Write-Warning "Package creation failed - will use folder deployment"
-            }
-          } catch {
-            Write-Warning "Package creation failed: $($_.Exception.Message)"
+          if ($LASTEXITCODE -eq 0 -and (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip")) {
+            $packageInfo = Get-Item "${{ env.PACKAGE_PATH }}\TodoApp.zip"
+            Write-Host "[SUCCESS] Web Deploy package created successfully" -ForegroundColor Green
+            Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
+            Write-Host "Package location: $($packageInfo.FullName)"
+          } else {
+            Write-Warning "Package creation failed - will use folder deployment"
           }
-        } else {
-          Write-Host "[INFO] Skipping package creation - requires Administrator privileges"
+        } catch {
+          Write-Warning "Package creation failed: $($_.Exception.Message)"
         }
 
     - name: Create backup
@@ -406,211 +332,125 @@ jobs:
       run: |
         Write-Host "=== SETTING UP IIS APPLICATION POOL AND WEBSITE ===" -ForegroundColor Yellow
         
-        # Check admin privileges
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-        Write-Host "[INFO] Running as Administrator: $isAdmin"
-        
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $appPoolName = "${{ env.IIS_APP_POOL }}"
         $sitePath = "${{ env.IIS_SITE_PATH }}"
-        $environment = "${{ inputs.environment || 'production' }}"
-        
-        if (!$isAdmin) {
-          Write-Host "[WARNING] Limited functionality without Administrator privileges" -ForegroundColor Yellow
-          Write-Host "[INFO] Some IIS management operations may be skipped"
-        }
+        $msdeployPath = $env:MSDEPLOY_PATH
         
         # Ensure deployment directory exists with proper permissions
         Write-Host "Setting up deployment directory: $sitePath"
+        if (!(Test-Path $sitePath)) {
+          # Create directory structure
+          New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
+          New-Item -ItemType Directory -Path "$sitePath\logs" -Force -ErrorAction SilentlyContinue | Out-Null
+          New-Item -ItemType Directory -Path "$sitePath\App_Data" -Force -ErrorAction SilentlyContinue | Out-Null
+          Write-Host "[SUCCESS] Created deployment directory: $sitePath" -ForegroundColor Green
+        } else {
+          Write-Host "[INFO] Deployment directory already exists: $sitePath" -ForegroundColor Cyan
+        }
+        
+        # Set proper permissions for IIS
         try {
-          if (!(Test-Path $sitePath)) {
-            if ($isAdmin) {
-              # Create directory structure
-              New-Item -ItemType Directory -Path $sitePath -Force | Out-Null
-              New-Item -ItemType Directory -Path "$sitePath\logs" -Force -ErrorAction SilentlyContinue | Out-Null
-              New-Item -ItemType Directory -Path "$sitePath\App_Data" -Force -ErrorAction SilentlyContinue | Out-Null
-              
-              Write-Host "[SUCCESS] Created deployment directory: $sitePath" -ForegroundColor Green
-              
-              # Set proper permissions for IIS
-              try {
-                icacls $sitePath /grant "IIS_IUSRS:(OI)(CI)R" /T /Q | Out-Null
-                icacls $sitePath /grant "IUSR:(OI)(CI)R" /T /Q | Out-Null
-                icacls "$sitePath\logs" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null | Out-Null
-                icacls "$sitePath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null | Out-Null
-                Write-Host "[SUCCESS] Set IIS permissions on deployment directory" -ForegroundColor Green
-              } catch {
-                Write-Warning "Could not set all permissions: $($_.Exception.Message)"
-              }
-            } else {
-              Write-Warning "Cannot create deployment directory without admin privileges"
-              Write-Host "[INFO] Please create directory manually or run as Administrator"
-            }
-          } else {
-            Write-Host "[INFO] Deployment directory already exists: $sitePath" -ForegroundColor Cyan
-          }
+          icacls $sitePath /grant "IIS_IUSRS:(OI)(CI)R" /T /Q | Out-Null
+          icacls $sitePath /grant "IUSR:(OI)(CI)R" /T /Q | Out-Null
+          icacls "$sitePath\logs" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null | Out-Null
+          icacls "$sitePath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T /Q 2>$null | Out-Null
+          Write-Host "[SUCCESS] Set IIS permissions on deployment directory" -ForegroundColor Green
         } catch {
-          Write-Warning "Failed to create deployment directory: $($_.Exception.Message)"
+          Write-Warning "Could not set all permissions: $($_.Exception.Message)"
         }
-        
-        # Get MSDeploy path
-        $msdeployPath = $env:MSDEPLOY_PATH
-        if (!$msdeployPath) {
-          $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          if (!(Test-Path $msdeployPath)) {
-            $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          }
-        }
-        
+
         # Create Application Pool using Web Deploy
         Write-Host "Creating/Configuring Application Pool: $appPoolName"
-        $appPoolCreated = $false
-        
-        if ($isAdmin -and (Test-Path $msdeployPath)) {
-          try {
-            Write-Host "Attempting to create application pool with Web Deploy..."
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:appPool `
-              -dest:appPool="$appPoolName",managedRuntimeVersion="",enable32BitAppOnWin64=false,processModel.identityType=ApplicationPoolIdentity `
-              -verbose
-              
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] Application pool created/configured with Web Deploy"
-              $appPoolCreated = $true
-            } else {
-              Write-Warning "[WARNING] Application pool operation completed with warnings (exit code: $LASTEXITCODE)"
-            }
-          } catch {
-            Write-Warning "[WARNING] Application pool creation failed: $($_.Exception.Message)"
-          }
-          
-          # Fallback to appcmd if Web Deploy failed
-          if (!$appPoolCreated) {
-            try {
-              Write-Host "[INFO] Attempting fallback with appcmd..."
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add apppool /name:"$appPoolName" /managedRuntimeVersion:"" /processModel.identityType:ApplicationPoolIdentity
-              if ($LASTEXITCODE -eq 0) {
-                Write-Host "[SUCCESS] Application pool created with appcmd fallback"
-                $appPoolCreated = $true
-              }
-            } catch {
-              Write-Warning "[WARNING] Fallback application pool creation also failed: $($_.Exception.Message)"
-            }
-          }
+        & "$msdeployPath" `
+          -verb:sync `
+          -source:appPool `
+          -dest:appPool="$appPoolName",managedRuntimeVersion="",enable32BitAppOnWin64=false,processModel.identityType=ApplicationPoolIdentity `
+          -verbose
+        if ($LASTEXITCODE -ne 0) {
+          Write-Warning "[WARNING] Application pool operation completed with warnings (exit code: $LASTEXITCODE)"
         } else {
-          if (!$isAdmin) {
-            Write-Host "[INFO] Skipping application pool creation - requires Administrator privileges"
-          } elseif (!(Test-Path $msdeployPath)) {
-            Write-Host "[INFO] Skipping application pool creation - Web Deploy not found"
-          }
-          Write-Host "[INFO] Please create application pool manually in IIS Manager:"
-          Write-Host "       Name: $appPoolName"
-          Write-Host "       .NET CLR Version: No Managed Code"
-          Write-Host "       Identity: ApplicationPoolIdentity"
+          Write-Host "[SUCCESS] Application pool created/configured with Web Deploy"
         }
-        
+
         # Create IIS Website using Web Deploy
         Write-Host "Creating/Configuring IIS Website: $siteName"
-        $websiteCreated = $false
-        
-        if ($isAdmin -and (Test-Path $sitePath) -and (Test-Path $msdeployPath)) {
-          try {
-            Write-Host "Attempting to create website with Web Deploy..."
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:appHostConfig="Default Web Site" `
-              -dest:appHostConfig="$siteName",computerName=localhost `
-              -enableRule:AppOffline `
-              -verbose
-              
-            # Configure site bindings and path
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:iisApp `
-              -dest:iisApp="$siteName",computerName=localhost,physicalPath="$sitePath",applicationPool="$appPoolName" `
-              -enableRule:AppOffline `
-              -verbose
-              
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] IIS Website created/configured with Web Deploy"
-              $websiteCreated = $true
-            } else {
-              Write-Warning "[WARNING] Website operation completed with warnings (exit code: $LASTEXITCODE)"
-            }
-          } catch {
-            Write-Warning "[WARNING] Website creation with Web Deploy failed: $($_.Exception.Message)"
-          }
+        & "$msdeployPath" `
+          -verb:sync `
+          -source:appHostConfig="Default Web Site" `
+          -dest:appHostConfig="$siteName",computerName=localhost `
+          -enableRule:AppOffline `
+          -verbose
           
-          # Fallback to appcmd if Web Deploy failed
-          if (!$websiteCreated) {
-            try {
-              Write-Host "[INFO] Attempting fallback with appcmd..."
-              # Create site first without application pool
-              & "$env:SystemRoot\System32\inetsrv\appcmd.exe" add site /name:"$siteName" /physicalPath:"$sitePath" /bindings:http/*:80:
-              if ($LASTEXITCODE -eq 0) {
-                Write-Host "[INFO] Website created, now assigning application pool..."
-                # Then assign application pool to the site
-                & "$env:SystemRoot\System32\inetsrv\appcmd.exe" set app "$siteName/" /applicationPool:"$appPoolName"
-                if ($LASTEXITCODE -eq 0) {
-                  Write-Host "[SUCCESS] Website created and configured with appcmd fallback"
-                  $websiteCreated = $true
-                } else {
-                  Write-Warning "[WARNING] Website created but failed to assign application pool"
-                }
-              }
-            } catch {
-              Write-Warning "[WARNING] Fallback website creation also failed: $($_.Exception.Message)"
-            }
-          }
+        # Configure site bindings and path
+        & "$msdeployPath" `
+          -verb:sync `
+          -source:iisApp `
+          -dest:iisApp="$siteName",computerName=localhost,physicalPath="$sitePath",applicationPool="$appPoolName" `
+          -enableRule:AppOffline `
+          -verbose
+          
+        if ($LASTEXITCODE -ne 0) {
+          Write-Warning "[WARNING] Website operation completed with warnings (exit code: $LASTEXITCODE)"
         } else {
-          if (!$isAdmin) {
-            Write-Host "[INFO] Skipping website creation - requires Administrator privileges"
-          } elseif (!(Test-Path $sitePath)) {
-            Write-Host "[INFO] Skipping website creation - deployment directory does not exist"
-          } elseif (!(Test-Path $msdeployPath)) {
-            Write-Host "[INFO] Skipping website creation - Web Deploy not found"
-          }
-          Write-Host "[INFO] Please create website manually in IIS Manager:"
-          Write-Host "       Name: $siteName"
-          Write-Host "       Physical Path: $sitePath"
-          Write-Host "       Application Pool: $appPoolName"
-          Write-Host "       Binding: http/*:80:"
-        }
-        
-        # Summary of IIS management results
-        if (!$isAdmin) {
-          Write-Host ""
-          Write-Host "============================================"
-          Write-Host "WARNING: MANUAL IIS SETUP REQUIRED"
-          Write-Host "============================================"
-          Write-Host ""
-          Write-Host "Since deployment is running without Administrator privileges,"
-          Write-Host "please complete the following manual setup in IIS Manager:"
-          Write-Host ""
-          Write-Host "1. Create Application Pool:"
-          Write-Host "   - Name: $appPoolName"
-          Write-Host "   - .NET CLR Version: No Managed Code"
-          Write-Host "   - Identity: ApplicationPoolIdentity"
-          Write-Host ""
-          Write-Host "2. Create Website:"
-          Write-Host "   - Name: $siteName"
-          Write-Host "   - Physical Path: $sitePath"
-          Write-Host "   - Application Pool: $appPoolName"
-          Write-Host "   - Binding: http/*:80:"
-          Write-Host ""
-          Write-Host "3. Create Directory (as Administrator):"
-          Write-Host "   New-Item -ItemType Directory -Path '$sitePath' -Force"
-          Write-Host "   icacls '$sitePath' /grant 'IIS_IUSRS:(OI)(CI)F' /T"
-          Write-Host ""
-          Write-Host "4. Alternative: Run setup script as Administrator:"
-          Write-Host "   .\scripts\setup-webdeploy.ps1"
-          Write-Host ""
-          Write-Host "============================================"
-          Write-Host ""
+          Write-Host "[SUCCESS] IIS Website created/configured with Web Deploy"
         }
         
         Write-Host "[SUCCESS] IIS Site management completed"
+
+    - name: Configure SSL Certificate
+      shell: powershell
+      run: |
+        Write-Host "=== CONFIGURING SSL CERTIFICATE ===" -ForegroundColor Yellow
+        
+        $pfxPath = ".\.github\workflows\key\origin.pfx"
+        $pfxPassword = $env:PFX_PASSWORD
+        $hostname = "phongmx.org"
+        $siteName = "${{ env.IIS_SITE_NAME }}"
+        
+        if (-not (Test-Path $pfxPath)) {
+          Write-Warning "SSL certificate not found at '$pfxPath'. Skipping SSL configuration."
+          exit 0
+        }
+        
+        if (-not $pfxPassword) {
+          Write-Warning "PFX_PASSWORD secret is not set. Skipping SSL configuration."
+          exit 0
+        }
+        
+        try {
+          Import-Module WebAdministration -ErrorAction Stop
+          
+          # Import certificate
+          $passwordSecure = ConvertTo-SecureString -String $pfxPassword -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\LocalMachine\My" -Password $passwordSecure
+          $thumbprint = $cert.Thumbprint
+          
+          Write-Host "[SUCCESS] Imported SSL certificate for '$hostname' with thumbprint: $thumbprint" -ForegroundColor Green
+          
+          # Get existing binding
+          $existingBinding = Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" -ErrorAction SilentlyContinue
+          
+          if ($existingBinding) {
+            Write-Host "Found existing HTTPS binding for '$hostname'. Removing it before creating a new one."
+            $existingBinding | Remove-WebBinding
+          }
+          
+          # Create new binding
+          Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName'..."
+          New-WebBinding -Name $siteName -IPAddress "*" -Port 443 -HostName $hostname -Protocol "https" -SslFlags 1
+          
+          # Assign certificate to the binding
+          Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" | ForEach-Object {
+            $_.AddSslCertificate($thumbprint, "my")
+          }
+          
+          Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443." -ForegroundColor Green
+          
+        } catch {
+          Write-Error "Failed to configure SSL certificate: $($_.Exception.Message)"
+          throw
+        }
 
     # ================================
     # APPLICATION DEPLOYMENT
@@ -621,348 +461,108 @@ jobs:
       run: |
         Write-Host "=== DEPLOYING APPLICATION ===" -ForegroundColor Yellow
         
-        # Initialize deployment variables
-        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
         $deploymentSuccess = $false
-        $deploymentMethod = "unknown"
-        $startTime = Get-Date
-        
         $msdeployPath = $env:MSDEPLOY_PATH
-        if (!$msdeployPath) {
-          $msdeployPath = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          if (!(Test-Path $msdeployPath)) {
-            $msdeployPath = "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          }
-        }
-        
         $siteName = "${{ env.IIS_SITE_NAME }}"
         $sourcePath = "${{ env.PUBLISH_PATH }}"
         $targetPath = "${{ env.IIS_SITE_PATH }}"
         $packagePath = "${{ env.PACKAGE_PATH }}\TodoApp.zip"
         $method = "${{ inputs.web_deploy_method || 'auto' }}"
         
-        # Convert to absolute paths to avoid path resolution issues
-        $sourcePath = Resolve-Path $sourcePath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path
-        if (!$sourcePath) {
-          $sourcePath = "${{ env.PUBLISH_PATH }}"
-        }
-        
-        $packagePath = if (Test-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip") {
-          Resolve-Path "${{ env.PACKAGE_PATH }}\TodoApp.zip" | Select-Object -ExpandProperty Path
-        } else {
-          "${{ env.PACKAGE_PATH }}\TodoApp.zip"
-        }
-        
-        Write-Host "Deployment method: $method"
-        Write-Host "Source path: ${sourcePath}"
-        Write-Host "Target path: ${targetPath}"
-        Write-Host "Package path: ${packagePath}"
-        Write-Host "Target site: $siteName"
-        
-        # Debug: Show current working directory and file existence
-        Write-Host ""
-        Write-Host "=== DEBUG INFORMATION ==="
-        Write-Host "Current working directory: $(Get-Location)"
-        Write-Host "Source exists: $(Test-Path $sourcePath)"
-        Write-Host "Package exists: $(Test-Path $packagePath)"
-        Write-Host "Target directory exists: $(Test-Path $targetPath)"
-        
-        if (Test-Path $sourcePath) {
-          $sourceFiles = Get-ChildItem -Path $sourcePath -Recurse -File | Measure-Object
-          Write-Host "Source files count: $($sourceFiles.Count)"
-        }
-        
-        if (Test-Path $packagePath) {
-          $packageInfo = Get-Item $packagePath
-          Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
-        }
-        Write-Host "=== END DEBUG INFORMATION ==="
-        Write-Host ""
-        
-        # Verify source exists
+        # Verify source and target directories
         if (!(Test-Path $sourcePath)) {
-          Write-Error "Source path does not exist: $sourcePath"
-          throw "Source path not found"
+          throw "Source path does not exist: $sourcePath"
         }
-        
-        # Ensure target directory exists
         if (!(Test-Path $targetPath)) {
-          Write-Host "Target directory does not exist, attempting to create: ${targetPath}"
-          try {
-            if ($isAdmin) {
-              # Create directory with full path
-              New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
-              Write-Host "[SUCCESS] Created target directory: ${targetPath}"
-              
-              # Set proper permissions
-              try {
-                icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
-                icacls $targetPath /grant "IUSR:(OI)(CI)R" /T | Out-Null
-                Write-Host "[SUCCESS] Set IIS permissions on target directory"
-              } catch {
-                Write-Warning "[WARNING] Could not set permissions: $($_.Exception.Message)"
-              }
-            } else {
-              Write-Warning "[WARNING] Cannot create target directory without admin privileges"
-              Write-Host "[INFO] Please create the directory manually as Administrator:"
-              Write-Host "       New-Item -ItemType Directory -Path '$targetPath' -Force"
-              Write-Host "       icacls '$targetPath' /grant 'IIS_IUSRS:(OI)(CI)F' /T"
-              Write-Host "       icacls '$targetPath' /grant 'IUSR:(OI)(CI)R' /T"
-              Write-Host ""
-              
-              # Try to create in a temporary location for testing
-              $tempPath = "$env:TEMP\TodoApp_Deploy_Test"
-              try {
-                New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
-                Write-Host "[INFO] Created temporary directory for testing: $tempPath"
-                Write-Host "[INFO] You can manually copy files from here to IIS directory later"
-                
-                # Update target path to temp for this deployment
-                $originalTargetPath = $targetPath
-                $targetPath = $tempPath
-                Write-Host "[INFO] Using temporary target path: ${targetPath}"
-              } catch {
-                Write-Warning "[WARNING] Could not create temporary directory: $($_.Exception.Message)"
-              }
-            }
-          } catch {
-            Write-Warning "[WARNING] Failed to create target directory: $($_.Exception.Message)"
-          }
-        } else {
-          Write-Host "[INFO] Target directory already exists: ${targetPath}"
+          Write-Host "Target directory does not exist, creating: ${targetPath}"
+          New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+          icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
         }
         
-        # Choose deployment method
-        $deploymentSuccess = $false
-        
-        # Method 1: Try package deployment if package exists and we have admin rights
-        if ((Test-Path $packagePath) -and $isAdmin -and ($method -eq "auto" -or $method -eq "package")) {
+        # Method 1: Try package deployment if package exists
+        if ((Test-Path $packagePath) -and ($method -eq "auto" -or $method -eq "package")) {
           Write-Host "Attempting package deployment..."
-          Write-Host "Package file: ${packagePath}"
-          Write-Host "Target IIS app: $siteName"
+          $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
           
-          try {
-            # Use absolute path for package to avoid path resolution issues
-            $absolutePackagePath = if ([System.IO.Path]::IsPathRooted($packagePath)) { 
-              $packagePath 
-            } else { 
-              Join-Path (Get-Location) $packagePath 
-            }
+          & "$msdeployPath" `
+            -verb:sync `
+            -source:package="$absolutePackagePath" `
+            -dest:iisApp="$siteName",computerName=localhost `
+            -setParamFile:"parameters/setParameters.xml" `
+            -enableRule:AppOffline `
+            -enableRule:DoNotDeleteRule `
+            -allowUntrusted:true `
+            -verbose
             
-            Write-Host "Using absolute package path: ${absolutePackagePath}"
-            
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:package="$absolutePackagePath" `
-              -dest:iisApp="$siteName",computerName=localhost `
-              -enableRule:AppOffline `
-              -enableRule:DoNotDeleteRule `
-              -allowUntrusted:true `
-              -verbose
-              
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] Package deployment completed successfully"
-              $deploymentSuccess = $true
-            } else {
-              Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE"
-            }
-          } catch {
-            Write-Warning "[WARNING] Package deployment failed: $($_.Exception.Message)"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Package deployment completed successfully"
+            $deploymentSuccess = $true
+          } else {
+            Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE. Attempting folder sync."
           }
-        } elseif (!(Test-Path $packagePath)) {
-          Write-Host "[INFO] Package not found, skipping package deployment: ${packagePath}"
-        } elseif (!$isAdmin) {
-          Write-Host "[INFO] Skipping package deployment - requires Administrator privileges"
         }
         
         # Method 2: Direct folder sync (more reliable)
-        if (!$deploymentSuccess -and (Test-Path $targetPath)) {
+        if (!$deploymentSuccess) {
           Write-Host "Attempting direct folder synchronization..."
-          try {
-            # Stop application first if we have admin rights
-            if ($isAdmin) {
-              Write-Host "Taking application offline..."
-              $appOfflineContent = "App is being updated. Please try again in a moment."
-              $appOfflineContent | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
-              Start-Sleep -Seconds 2
-            }
+          
+          # Take application offline
+          "App is being updated." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
+          Start-Sleep -Seconds 2
+          
+          # Sync files using Web Deploy
+          $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
+          
+          & "$msdeployPath" `
+            -verb:sync `
+            -source:contentPath="$absoluteSourcePath" `
+            -dest:contentPath="$targetPath",computerName=localhost `
+            -enableRule:DoNotDeleteRule `
+            -skip:Directory="\\logs$" `
+            -skip:Directory="\\App_Data$" `
+            -skip:File="\\app_offline\.htm$" `
+            -allowUntrusted:true `
+            -verbose
             
-            # Sync files using Web Deploy
-            Write-Host "Syncing from: ${sourcePath}"
-            Write-Host "Syncing to: ${targetPath}"
-            
-            # Use absolute paths for both source and destination
-            $absoluteSourcePath = if ([System.IO.Path]::IsPathRooted($sourcePath)) { 
-              $sourcePath 
-            } else { 
-              Join-Path (Get-Location) $sourcePath 
-            }
-            
-            Write-Host "Using absolute source path: ${absoluteSourcePath}"
-            
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:contentPath="$absoluteSourcePath" `
-              -dest:contentPath="$targetPath",computerName=localhost `
-              -enableRule:DoNotDeleteRule `
-              -skip:Directory="\\logs$" `
-              -skip:Directory="\\App_Data$" `
-              -skip:File="\\app_offline\.htm$" `
-              -allowUntrusted:true `
-              -verbose
-              
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] Folder synchronization completed successfully"
-              $deploymentSuccess = $true
-            } else {
-              Write-Warning "[WARNING] Folder sync failed with exit code: $LASTEXITCODE"
-            }
-            
-            # Remove app_offline.htm
-            if ((Test-Path "$targetPath\app_offline.htm") -and $isAdmin) {
-              Remove-Item "$targetPath\app_offline.htm" -Force
-              Write-Host "[INFO] Application brought back online"
-            }
-            
-          } catch {
-            Write-Warning "[WARNING] Folder synchronization failed: $($_.Exception.Message)"
-            
-            # Remove app_offline.htm in case of failure
-            if ((Test-Path "$targetPath\app_offline.htm") -and $isAdmin) {
-              Remove-Item "$targetPath\app_offline.htm" -Force
-            }
+          # Remove app_offline.htm
+          if (Test-Path "$targetPath\app_offline.htm") {
+            Remove-Item "$targetPath\app_offline.htm" -Force
           }
-        } elseif (!(Test-Path $targetPath)) {
-          Write-Host "[INFO] Skipping Web Deploy sync - target directory does not exist: ${targetPath}"
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Folder synchronization completed successfully"
+            $deploymentSuccess = $true
+          } else {
+            Write-Warning "[WARNING] Folder sync failed with exit code: $LASTEXITCODE. Attempting file copy."
+          }
         }
         
         # Method 3: Fallback to simple file copy
-        if (!$deploymentSuccess -and (Test-Path $targetPath)) {
+        if (!$deploymentSuccess) {
           Write-Host "Web Deploy methods failed, falling back to file copy..."
-          try {
-            # Stop IIS services if we have admin rights
-            if ($isAdmin) {
-              try {
-                Import-Module WebAdministration -ErrorAction SilentlyContinue
-                Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-                Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 3
-                Write-Host "[INFO] Stopped IIS services for file copy"
-              } catch {
-                Write-Warning "[WARNING] Could not stop IIS services: $($_.Exception.Message)"
-              }
-            }
-            
-            # Copy files
-            Write-Host "Copying files from ${sourcePath} to ${targetPath}..."
-            
-            # Use absolute paths for file copy
-            $absoluteSourcePath = if ([System.IO.Path]::IsPathRooted($sourcePath)) { 
-              $sourcePath 
-            } else { 
-              Join-Path (Get-Location) $sourcePath 
-            }
-            
-            Write-Host "Using absolute source path for copy: ${absoluteSourcePath}"
-            
-            if (Test-Path $absoluteSourcePath) {
-              Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
-              Write-Host "[SUCCESS] Files copied successfully"
-              
-              # Verify copy
-              $copiedFiles = Get-ChildItem -Path $targetPath -Recurse -File | Measure-Object
-              Write-Host "[INFO] Copied $($copiedFiles.Count) files to target directory"
-            } else {
-              Write-Error "Source path does not exist: ${absoluteSourcePath}"
-              throw "Source path not found for file copy"
-            }
-            
-            # Start IIS services if we have admin rights
-            if ($isAdmin) {
-              try {
-                Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
-                Start-Website -Name "$siteName"
-                Write-Host "[INFO] Started IIS services after file copy"
-              } catch {
-                Write-Warning "[WARNING] Could not start IIS services: $($_.Exception.Message)"
-              }
-            }
-            
-            Write-Host "[SUCCESS] Fallback file copy deployment completed"
-            $deploymentSuccess = $true
-          } catch {
-            Write-Warning "[WARNING] File copy deployment failed: $($_.Exception.Message)"
-          }
-        } elseif (!(Test-Path $targetPath)) {
-          Write-Host "[ERROR] Cannot deploy - target directory does not exist and cannot be created"
-          Write-Host "[INFO] Please create the target directory manually:"
-          Write-Host "       New-Item -ItemType Directory -Path '$targetPath' -Force"
-          Write-Host "       icacls '$targetPath' /grant 'IIS_IUSRS:(OI)(CI)F' /T"
+          
+          # Stop IIS services
+          Import-Module WebAdministration -ErrorAction SilentlyContinue
+          Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
+          Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+          
+          # Copy files
+          $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
+          Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
+          
+          # Start IIS services
+          Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
+          Start-Website -Name "$siteName"
+          
+          Write-Host "[SUCCESS] Fallback file copy deployment completed"
+          $deploymentSuccess = $true
         }
         
         if ($deploymentSuccess) {
-          Write-Host "[SUCCESS] Application deployment completed successfully"
-          
-          # Display deployed files
-          if (Test-Path $targetPath) {
-            Write-Host ""
-            Write-Host "Deployed files in ${targetPath}:"
-            Get-ChildItem -Path $targetPath | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
-            
-            # Check if deployed to temp directory
-            if ($targetPath -like "*Temp*") {
-              Write-Host ""
-              Write-Host "============================================"
-              Write-Host "MANUAL STEP REQUIRED"
-              Write-Host "============================================"
-              Write-Host ""
-              Write-Host "Files were deployed to temporary directory due to permission restrictions."
-              Write-Host "To complete deployment, run the manual copy script as Administrator:"
-              Write-Host ""
-              Write-Host "   .\scripts\manual-copy-deployment.ps1"
-              Write-Host ""
-              Write-Host "Or follow the manual deployment guide: MANUAL-DEPLOYMENT-GUIDE.md"
-              Write-Host ""
-              Write-Host "Temporary directory: ${targetPath}"
-              Write-Host "Target IIS directory: C:\inetpub\wwwroot\TodoApp"
-              Write-Host ""
-              Write-Host "============================================"
-            } else {
-              Write-Host ""
-              Write-Host "SUCCESS: Deployment completed successfully to IIS directory!"
-              Write-Host "Your application should now be accessible via web browser."
-            }
-          }
+          Write-Host "[SUCCESS] Application deployment completed successfully" -ForegroundColor Green
         } else {
-          Write-Host ""
-          Write-Host "============================================"
-          Write-Host "WARNING: DEPLOYMENT COULD NOT BE COMPLETED"
-          Write-Host "============================================"
-          Write-Host ""
-          Write-Host "Possible solutions:"
-          Write-Host "1. Run GitHub Actions runner as Administrator"
-          Write-Host "2. Create target directory manually:"
-          Write-Host "   New-Item -ItemType Directory -Path '${targetPath}' -Force"
-          Write-Host "   icacls '${targetPath}' /grant 'IIS_IUSRS:(OI)(CI)F' /T"
-          Write-Host "3. Run the setup script as Administrator:"
-          Write-Host "   .\scripts\setup-webdeploy.ps1"
-          Write-Host "4. Use the traditional deployment workflow: deploy-iis.yml"
-          Write-Host "5. Use manual deployment script: .\scripts\manual-copy-deployment.ps1"
-          Write-Host ""
-          Write-Host "============================================"
-          
-          # Don't throw error, just warn - this is expected behavior
-          Write-Host "[INFO] This is expected when running without Administrator privileges"
-          Write-Host "[INFO] Please follow the solutions above to complete deployment"
-          
-          # Set deployment success to true if temp deployment worked
-          if ($targetPath -like "*Temp*" -and (Test-Path $targetPath)) {
-            $tempFiles = Get-ChildItem -Path $targetPath -Recurse -File -ErrorAction SilentlyContinue
-            if ($tempFiles.Count -gt 0) {
-              Write-Host "[INFO] Temp directory deployment was successful - marking as success"
-              $deploymentSuccess = $true
-            }
-          }
+          throw "All deployment methods failed."
         }
 
     - name: Application Health Check
@@ -972,20 +572,14 @@ jobs:
       run: |
         Write-Host "=== APPLICATION HEALTH CHECK ===" -ForegroundColor Yellow
         
-        $siteName = "${{ env.IIS_SITE_NAME }}"
-        $environment = "${{ inputs.environment || 'production' }}"
         $maxAttempts = 12
         $delaySeconds = 10
         
-        # Determine health check URL based on environment
-        $healthCheckUrls = @()
-        if ($environment -eq "production") {
-          $healthCheckUrls += "http://localhost"
-          $healthCheckUrls += "http://127.0.0.1"
-        } else {
-          $healthCheckUrls += "http://localhost/$siteName"
-          $healthCheckUrls += "http://127.0.0.1/$siteName"
-        }
+        # Determine health check URL
+        $healthCheckUrls = @(
+          "https://phongmx.org",
+          "http://localhost"
+        )
         
         Write-Host "Health check URLs: $($healthCheckUrls -join ', ')"
         Write-Host "Max attempts: $maxAttempts, Delay: ${delaySeconds}s"
@@ -1003,9 +597,6 @@ jobs:
               
               if ($response.StatusCode -eq 200) {
                 Write-Host "[SUCCESS] Application is healthy!" -ForegroundColor Green
-                Write-Host "  URL: $url"
-                Write-Host "  Status Code: $($response.StatusCode)"
-                Write-Host "  Response Size: $($response.Content.Length) bytes"
                 $healthCheckPassed = $true
                 break
               } else {
@@ -1027,19 +618,7 @@ jobs:
         
         if (!$healthCheckPassed) {
           Write-Error "Health check failed for all URLs after $maxAttempts attempts each"
-          Write-Host ""
-          Write-Host "Troubleshooting steps:"
-          Write-Host "1. Check IIS Manager - ensure site is started"
-          Write-Host "2. Check Application Pool - ensure it's running"
-          Write-Host "3. Check Windows Event Logs for errors"
-          Write-Host "4. Verify .NET runtime is installed"
-          Write-Host "5. Check file permissions on deployment directory"
-          
-          if ("${{ inputs.force_deploy }}" -eq "true") {
-            Write-Warning "Health check failed but continuing due to force_deploy flag"
-          } else {
-            throw "Deployment health check failed"
-          }
+          throw "Deployment health check failed"
         }
 
     - name: Deployment Summary and Cleanup
@@ -1094,19 +673,8 @@ jobs:
           Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
           Write-Host ""
           Write-Host "Next Steps:" -ForegroundColor Yellow
-          Write-Host "  - Verify application functionality"
+          Write-Host "  - Verify application functionality at https://phongmx.org"
           Write-Host "  - Monitor application logs"
-          Write-Host "  - Check performance metrics"
-          Write-Host "  - Update monitoring dashboards"
-          
-          if ($environment -eq "production") {
-            Write-Host ""
-            Write-Host "Production Checklist:" -ForegroundColor Magenta
-            Write-Host "  - SSL certificate configured"
-            Write-Host "  - Security headers enabled"
-            Write-Host "  - Monitoring alerts active"
-            Write-Host "  - Backup verification"
-          }
         } else {
           Write-Host "DEPLOYMENT FAILED!" -ForegroundColor Red
           Write-Host ""
@@ -1114,8 +682,6 @@ jobs:
           Write-Host "  - Check GitHub Actions logs above"
           Write-Host "  - Review Windows Event Logs"
           Write-Host "  - Verify IIS configuration"
-          Write-Host "  - Check file permissions"
-          Write-Host "  - Consult WEB-DEPLOY-TROUBLESHOOTING.md"
           
           # Show rollback information
           $latestBackup = Get-ChildItem -Path "${{ env.BACKUP_PATH }}" -Directory -ErrorAction SilentlyContinue | 
@@ -1126,16 +692,10 @@ jobs:
             Write-Host ""
             Write-Host "Rollback Available:" -ForegroundColor Cyan
             Write-Host "  Latest backup: $($latestBackup.Name)"
-            Write-Host "  Location: $($latestBackup.FullName)"
-            Write-Host "  To rollback: Copy contents to ${{ env.IIS_SITE_PATH }}"
+            Write-Host "  To rollback: Copy contents from $($latestBackup.FullName) to ${{ env.IIS_SITE_PATH }}"
           }
         }
         
-        Write-Host ""
-        Write-Host "Support:" -ForegroundColor White
-        Write-Host "  - Documentation: README.md, DEPLOYMENT.md"
-        Write-Host "  - Troubleshooting: WEB-DEPLOY-TROUBLESHOOTING.md"
-        Write-Host "  - Scripts: scripts/ directory"
         Write-Host ""
         Write-Host "===============================================" -ForegroundColor Cyan
 
@@ -1149,7 +709,7 @@ jobs:
         
         if ($webhook) {
           try {
-                         $status = if ($success) { "SUCCESS" } else { "FAILED" }
+            $status = if ($success) { "SUCCESS" } else { "FAILED" }
             $color = if ($success) { "good" } else { "danger" }
             
             $payload = @{
