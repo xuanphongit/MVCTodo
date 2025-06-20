@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<parameters>
+  <!-- Application settings parameters -->
+  <parameter name="Authentication-DefaultCredentials-Username" 
+             description="Default authentication username"
+             defaultValue="">
+    <parameterEntry kind="TextFile" 
+                    scope="\\appsettings\.json$" 
+                    match="{{USERNAME_PLACEHOLDER}}" />
+  </parameter>
+
+  <parameter name="Authentication-DefaultCredentials-Password" 
+             description="Default authentication password"
+             defaultValue="">
+    <parameterEntry kind="TextFile" 
+                    scope="\\appsettings\.json$" 
+                    match="{{PASSWORD_PLACEHOLDER}}" />
+  </parameter>
+
+  <!-- Connection string parameter (if you add database later) -->
+  <parameter name="DefaultConnection" 
+             description="Default database connection string"
+             defaultValue="">
+    <parameterEntry kind="XmlFile" 
+                    scope="\\appsettings\.json$" 
+                    match="/configuration/connectionStrings/add[@name='DefaultConnection']/@connectionString" />
+  </parameter>
+
+  <!-- IIS Application settings -->
+  <parameter name="IIS Web Application Name" 
+             description="Full path of the web application"
+             defaultValue="Default Web Site/TodoApp">
+    <parameterEntry kind="DeploymentObjectAttribute" 
+                    scope="iisApp" 
+                    match="^.*$" />
+  </parameter>
+
+  <!-- Environment specific parameters -->
+  <parameter name="ASPNETCORE-ENVIRONMENT" 
+             description="ASP.NET Core environment"
+             defaultValue="Production">
+    <parameterEntry kind="XmlFile" 
+                    scope="\\web\.config$" 
+                    match="/configuration/system.webServer/aspNetCore/@environment" />
+  </parameter>
+
+  <!-- Logging level parameter -->
+  <parameter name="Logging-LogLevel-Default" 
+             description="Default logging level"
+             defaultValue="Information">
+    <parameterEntry kind="TextFile" 
+                    scope="\\appsettings\.json$" 
+                    match="{{LOGLEVEL_PLACEHOLDER}}" />
+  </parameter>
+
+  <!-- Domain configuration -->
+  <parameter name="Application-Domain" 
+             description="Application domain name"
+             defaultValue="phongmx.org">
+    <parameterEntry kind="TextFile" 
+                    scope="\\appsettings\.json$" 
+                    match="{{DOMAIN_PLACEHOLDER}}" />
+  </parameter>
+
+  <!-- SSL Configuration -->
+  <parameter name="Application-UseSSL" 
+             description="Force HTTPS redirection"
+             defaultValue="true">
+    <parameterEntry kind="TextFile" 
+                    scope="\\appsettings\.json$" 
+                    match="{{SSL_PLACEHOLDER}}" />
+  </parameter>
+
+  <!-- HTTPS Binding Configuration -->
+  <parameter name="HTTPS-Binding-Domain" 
+             description="Domain for HTTPS binding"
+             defaultValue="phongmx.org">
+    <parameterEntry kind="TextFile" 
+                    scope="\\web\.config$" 
+                    match="{{HTTPS_DOMAIN_PLACEHOLDER}}" />
+  </parameter>
+</parameters> 

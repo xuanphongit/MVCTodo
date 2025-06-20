@@ -4,7 +4,24 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- Web Deploy Configuration -->
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
+    <AutoParameterizationWebConfigConnectionStrings>false</AutoParameterizationWebConfigConnectionStrings>
+    <EnableMSDeployAppOffline>true</EnableMSDeployAppOffline>
   </PropertyGroup>
+
+  <!-- Web Deploy Parameters -->
+  <ItemGroup>
+    <MsDeployParameterFile Include="Parameters.xml" />
+  </ItemGroup>
+
+  <!-- Include setParameters files in build output -->
+  <ItemGroup>
+    <Content Include="parameters\*.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <!-- 
   Security Note: Microsoft.VisualStudio.Web.CodeGeneration.Design was removed due to CVE-2025-48734

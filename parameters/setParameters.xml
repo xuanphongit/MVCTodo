@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<parameters>
+  <setParameter name="Authentication-DefaultCredentials-Username" value="admin" />
+  <setParameter name="Authentication-DefaultCredentials-Password" value="admin123" />
+  <setParameter name="IIS Web Application Name" value="Default Web Site/TodoApp" />
+  <setParameter name="ASPNETCORE-ENVIRONMENT" value="Production" />
+  <setParameter name="Logging-LogLevel-Default" value="Information" />
+  <setParameter name="DefaultConnection" value="" />
+</parameters> 

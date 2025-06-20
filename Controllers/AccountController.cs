@@ -8,6 +8,13 @@ namespace Todo.Controllers
 {
     public class AccountController : Controller
     {
+        private readonly IConfiguration _configuration;
+
+        public AccountController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
         [HttpGet]
         public IActionResult Login()
         {
@@ -83,7 +90,10 @@ namespace Todo.Controllers
 
         private bool IsValidUser(User user)
         {
-            var isValid = user.Username == "admin" && user.Password == "admin123";
+            var configUsername = _configuration["Authentication:DefaultCredentials:Username"];
+            var configPassword = _configuration["Authentication:DefaultCredentials:Password"];
+            
+            var isValid = user.Username == configUsername && user.Password == configPassword;
             Console.WriteLine($"IsValidUser check - Username: {user.Username}, IsValid: {isValid}");
             return isValid;
         }

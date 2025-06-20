@@ -1,0 +1,278 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+      server_url:
+        description: 'Web Deploy Server URL'
+        required: true
+        type: string
+        default: 'https://your-server:8172/msdeploy.axd'
+      whatif:
+        description: 'Run in WhatIf mode (validation only)'
+        required: false
+        type: boolean
+        default: false
+      skip_build:
+        description: 'Skip build and use existing artifacts'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  BUILD_CONFIGURATION: 'Release'
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    environment: ${{ github.event.inputs.environment || 'development' }}
+    
+    steps:
+    # ===========================================
+    # BUILD PHASE
+    # ===========================================
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      if: github.event.inputs.skip_build != 'true'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      if: github.event.inputs.skip_build != 'true'
+      run: dotnet restore
+      
+    - name: Build application
+      if: github.event.inputs.skip_build != 'true'
+      run: dotnet build --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      
+    - name: Run tests
+      if: github.event.inputs.skip_build != 'true'
+      run: dotnet test --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal
+      continue-on-error: true
+      
+    - name: Create Web Deploy Package
+      if: github.event.inputs.skip_build != 'true'
+      run: |
+        $packageName = "TodoApp.${{ github.run_number }}.zip"
+        Write-Host "Creating package: $packageName" -ForegroundColor Green
+        
+        if (!(Test-Path "deploy-artifacts")) { 
+          New-Item -ItemType Directory -Path "deploy-artifacts" 
+        }
+        
+        dotnet msbuild Todo.csproj `
+          /p:Configuration=${{ env.BUILD_CONFIGURATION }} `
+          /p:Platform="Any CPU" `
+          /p:WebPublishMethod=Package `
+          /p:PackageAsSingleFile=true `
+          /p:PackageLocation="deploy-artifacts/$packageName" `
+          /p:IncludeSetParameters=true `
+          /p:ParametersXmlFile=Parameters.xml `
+          /t:WebPublish
+          
+    - name: Copy deployment files
+      if: github.event.inputs.skip_build != 'true'
+      run: |
+        # Copy setParameters files
+        Copy-Item "parameters/*.xml" "deploy-artifacts/"
+        
+        # Create build info
+        $buildInfo = @{
+          PackageName = "TodoApp.${{ github.run_number }}"
+          Version = "${{ github.run_number }}"
+          BuildDate = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+          Configuration = "${{ env.BUILD_CONFIGURATION }}"
+          GitCommit = "${{ github.sha }}"
+          Branch = "${{ github.ref_name }}"
+          Workflow = "${{ github.workflow }}"
+          Environment = "${{ github.event.inputs.environment || 'development' }}"
+        }
+        $buildInfo | ConvertTo-Json | Out-File "deploy-artifacts/build-info.json"
+        
+        Write-Host "Build artifacts created:" -ForegroundColor Green
+        Get-ChildItem deploy-artifacts/ | ForEach-Object {
+          Write-Host "  - $($_.Name) ($([math]::Round($_.Length/1MB, 2)) MB)" -ForegroundColor Gray
+        }
+
+    # ===========================================
+    # DEPLOYMENT PHASE
+    # ===========================================
+    - name: Determine deployment environment
+      id: deploy-env
+      run: |
+        # For push events, deploy to development
+        # For manual trigger, use the selected environment
+        if ("${{ github.event_name }}" -eq "push") {
+          $environment = "development"
+          $serverUrl = "${{ secrets.DEV_SERVER_URL || 'https://dev-server:8172/msdeploy.axd' }}"
+        } else {
+          $environment = "${{ github.event.inputs.environment }}"
+          $serverUrl = "${{ github.event.inputs.server_url }}"
+        }
+        
+        Write-Host "Deployment Environment: $environment" -ForegroundColor Yellow
+        Write-Host "Server URL: $serverUrl" -ForegroundColor Yellow
+        
+        # Set outputs for next steps
+        echo "environment=$environment" >> $env:GITHUB_OUTPUT
+        echo "server_url=$serverUrl" >> $env:GITHUB_OUTPUT
+        
+    - name: Validate deployment prerequisites
+      run: |
+        $environment = "${{ steps.deploy-env.outputs.environment }}"
+        $serverUrl = "${{ steps.deploy-env.outputs.server_url }}"
+        $packageFile = "deploy-artifacts/TodoApp.${{ github.run_number }}.zip"
+        $setParamsFile = "deploy-artifacts/setParameters.$environment.xml"
+        
+        Write-Host "Validating deployment prerequisites..." -ForegroundColor Yellow
+        
+        # Check if package exists
+        if (!(Test-Path $packageFile)) {
+          throw "Package file not found: $packageFile"
+        }
+        
+        # Check if setParameters file exists
+        if (!(Test-Path $setParamsFile)) {
+          throw "SetParameters file not found: $setParamsFile"
+        }
+        
+        # Check if credentials are available
+        if (-not $env:DEPLOY_USERNAME -or -not $env:DEPLOY_PASSWORD) {
+          throw "Deployment credentials not found. Please set DEPLOY_USERNAME and DEPLOY_PASSWORD secrets."
+        }
+        
+        Write-Host "✅ All prerequisites validated successfully!" -ForegroundColor Green
+      env:
+        DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
+        DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+        
+    - name: Deploy to target environment
+      env:
+        DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
+        DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+      run: |
+        $environment = "${{ steps.deploy-env.outputs.environment }}"
+        $serverUrl = "${{ steps.deploy-env.outputs.server_url }}"
+        $packageFile = "deploy-artifacts/TodoApp.${{ github.run_number }}.zip"
+        $setParamsFile = "deploy-artifacts/setParameters.$environment.xml"
+        $whatif = "${{ github.event.inputs.whatif }}" -eq "true"
+        
+        Write-Host "🚀 Starting deployment..." -ForegroundColor Green
+        Write-Host "Environment: $environment" -ForegroundColor Cyan
+        Write-Host "Server: $serverUrl" -ForegroundColor Cyan
+        Write-Host "Package: $packageFile" -ForegroundColor Cyan
+        Write-Host "SetParams: $setParamsFile" -ForegroundColor Cyan
+        Write-Host "WhatIf Mode: $whatif" -ForegroundColor Cyan
+        
+        # Build deployment arguments
+        $deployArgs = @(
+          "-PackageFile", $packageFile
+          "-Environment", $environment
+          "-ServerUrl", $serverUrl
+          "-Username", $env:DEPLOY_USERNAME
+          "-Password", $env:DEPLOY_PASSWORD
+          "-SetParametersPath", $setParamsFile
+          "-AllowUntrusted"
+          "-EnableBackup"
+        )
+        
+        if ($whatif) {
+          $deployArgs += "-WhatIf"
+        }
+        
+        # Execute deployment
+        try {
+          & "./scripts/deploy-package.ps1" @deployArgs
+          Write-Host "✅ Deployment completed successfully!" -ForegroundColor Green
+        } catch {
+          Write-Host "❌ Deployment failed: $($_.Exception.Message)" -ForegroundColor Red
+          throw
+        }
+        
+    - name: Post-deployment validation
+      if: github.event.inputs.whatif != 'true'
+      run: |
+        $environment = "${{ steps.deploy-env.outputs.environment }}"
+        $serverUrl = "${{ steps.deploy-env.outputs.server_url }}"
+        
+        # Wait for application to start
+        Write-Host "Waiting for application to start..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 30
+        
+        # Try to validate deployment
+        $serverName = $serverUrl -replace "https?://" -replace ":8172.*$"
+        $appUrl = "https://$serverName/TodoApp"
+        
+        try {
+          Write-Host "Validating deployment at: $appUrl" -ForegroundColor Yellow
+          $response = Invoke-WebRequest -Uri $appUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+          
+          if ($response.StatusCode -eq 200) {
+            Write-Host "✅ Application is responding successfully!" -ForegroundColor Green
+            Write-Host "Status Code: $($response.StatusCode)" -ForegroundColor Gray
+            Write-Host "Content Length: $($response.Content.Length) bytes" -ForegroundColor Gray
+          } else {
+            Write-Host "⚠️ Application responded with unexpected status: $($response.StatusCode)" -ForegroundColor Yellow
+          }
+        } catch {
+          Write-Host "⚠️ Could not validate application response: $($_.Exception.Message)" -ForegroundColor Yellow
+          Write-Host "This might be normal if the server is not publicly accessible or requires authentication." -ForegroundColor Gray
+        }
+        
+    - name: Deployment summary
+      if: always()
+      run: |
+        $environment = "${{ steps.deploy-env.outputs.environment }}"
+        $serverUrl = "${{ steps.deploy-env.outputs.server_url }}"
+        $whatifMode = "${{ github.event.inputs.whatif }}" -eq "true"
+        
+        Write-Host "" -ForegroundColor White
+        Write-Host "🚀 DEPLOYMENT SUMMARY" -ForegroundColor Cyan
+        Write-Host "=====================" -ForegroundColor Cyan
+        Write-Host "Environment: $environment" -ForegroundColor White
+        Write-Host "Package: TodoApp.${{ github.run_number }}.zip" -ForegroundColor White
+        Write-Host "Server: $serverUrl" -ForegroundColor White
+        Write-Host "Build Number: ${{ github.run_number }}" -ForegroundColor White
+        Write-Host "Git Commit: ${{ github.sha }}" -ForegroundColor White
+        Write-Host "WhatIf Mode: $whatifMode" -ForegroundColor White
+        Write-Host "Triggered By: ${{ github.event_name }}" -ForegroundColor White
+        
+        if (-not $whatifMode) {
+          $serverName = $serverUrl -replace "https?://" -replace ":8172.*$"
+          Write-Host "" -ForegroundColor White
+          Write-Host "🌐 Application URL: https://$serverName/TodoApp" -ForegroundColor Green
+        }
+        
+        if ("${{ job.status }}" -eq "success") {
+          Write-Host "" -ForegroundColor White
+          Write-Host "✅ Build and deployment completed successfully!" -ForegroundColor Green
+        } else {
+          Write-Host "" -ForegroundColor White
+          Write-Host "❌ Build and deployment failed. Check the logs above." -ForegroundColor Red
+        }
+
+    # ===========================================
+    # ARTIFACT UPLOAD (for debugging/backup)
+    # ===========================================
+    - name: Upload deployment artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Deploy-Artifacts-${{ github.run_number }}-${{ steps.deploy-env.outputs.environment }}
+        path: deploy-artifacts/
+        retention-days: 7 
