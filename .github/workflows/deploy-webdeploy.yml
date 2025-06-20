@@ -328,62 +328,149 @@ jobs:
         }
 
         # Import required modules for IIS management
-        Import-Module WebAdministration -ErrorAction Stop
+        Write-Host "Importing IIS management modules..."
+        try {
+          # Try importing WebAdministration module
+          Import-Module WebAdministration -ErrorAction Stop
+          Write-Host "[SUCCESS] WebAdministration module imported" -ForegroundColor Green
+        } catch {
+          Write-Warning "WebAdministration module not available. Installing IIS Management Tools..."
+          
+          # Install IIS Management Tools if not available
+          try {
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-CommonHttpFeatures -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpErrors -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpLogging -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpRedirect -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ApplicationDevelopment -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-NetFx45 -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-NetFxExtensibility45 -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ISAPIExtensions -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ISAPIFilter -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ASPNET45 -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-IIS6ManagementCompatibility -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-Metabase -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WMICompatibility -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-LegacyScripts -All -NoRestart
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-LegacySnapIn -All -NoRestart
+            
+            Write-Host "IIS features installed. Attempting to import WebAdministration module again..."
+            Import-Module WebAdministration -ErrorAction Stop
+            Write-Host "[SUCCESS] WebAdministration module imported after installation" -ForegroundColor Green
+            
+          } catch {
+            Write-Error "Failed to install IIS features or import WebAdministration module: $($_.Exception.Message)"
+            Write-Host "Attempting alternative approach using direct IIS commands..."
+            
+            # Alternative: Use appcmd.exe directly
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+            if (Test-Path $appcmdPath) {
+              Write-Host "Using appcmd.exe as alternative to WebAdministration module"
+              $env:USE_APPCMD = "true"
+            } else {
+              throw "Neither WebAdministration module nor appcmd.exe is available. IIS management tools are required."
+            }
+          }
+        }
         
         Write-Host "=== IIS WEB APP MANAGEMENT (Azure DevOps Style) ===" -ForegroundColor Cyan
         
         # IIS Application Pool Management
         Write-Host "Managing Application Pool: $appPoolName" -ForegroundColor Yellow
         try {
-          $appPoolExists = Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
-          
-          if ($appPoolExists) {
-            Write-Host "Application Pool '$appPoolName' exists. Stopping for reconfiguration..."
-            Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+          # Check if using alternative appcmd approach
+          if ($env:USE_APPCMD -eq "true") {
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
             
-            # Wait for pool to stop
-            $timeout = 30
-            $elapsed = 0
-            while ((Get-WebAppPool -Name $appPoolName).State -ne "Stopped" -and $elapsed -lt $timeout) {
-              Start-Sleep -Seconds 1
-              $elapsed++
+            # Check if app pool exists using appcmd
+            $appPoolExists = $false
+            try {
+              $result = & $appcmdPath list apppool $appPoolName 2>$null
+              $appPoolExists = $result -and $result.Length -gt 0
+            } catch {
+              $appPoolExists = $false
             }
-            if ($elapsed -ge $timeout) {
-              Write-Warning "Application pool '$appPoolName' did not stop within $timeout seconds. Current state: $((Get-WebAppPool -Name $appPoolName).State)"
+            
+            if ($appPoolExists) {
+              Write-Host "Application Pool '$appPoolName' exists. Stopping for reconfiguration..."
+              & $appcmdPath stop apppool $appPoolName
+              Start-Sleep -Seconds 3
+            } else {
+              Write-Host "Creating new Application Pool: $appPoolName"
+              & $appcmdPath add apppool /name:$appPoolName
             }
+            
+            # Configure Application Pool using appcmd
+            Write-Host "Configuring Application Pool settings using appcmd..."
+            & $appcmdPath set apppool $appPoolName /managedRuntimeVersion:""
+            & $appcmdPath set apppool $appPoolName /enable32BitAppOnWin64:false
+            & $appcmdPath set apppool $appPoolName /processModel.identityType:ApplicationPoolIdentity
+            & $appcmdPath set apppool $appPoolName /processModel.loadUserProfile:true
+            & $appcmdPath set apppool $appPoolName /processModel.idleTimeout:00:00:00
+            & $appcmdPath set apppool $appPoolName /processModel.maxProcesses:1
+            & $appcmdPath set apppool $appPoolName /failure.rapidFailProtection:true
+            & $appcmdPath set apppool $appPoolName /failure.rapidFailProtectionInterval:00:05:00
+            & $appcmdPath set apppool $appPoolName /failure.rapidFailProtectionMaxCrashes:5
+            
+            # Start the application pool
+            & $appcmdPath start apppool $appPoolName
+            Write-Host "[SUCCESS] Application Pool '$appPoolName' configured and started using appcmd" -ForegroundColor Green
+            
           } else {
-            Write-Host "Creating new Application Pool: $appPoolName"
-            New-WebAppPool -Name $appPoolName
+            # Use WebAdministration module
+            $appPoolExists = Get-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+            
+            if ($appPoolExists) {
+              Write-Host "Application Pool '$appPoolName' exists. Stopping for reconfiguration..."
+              Stop-WebAppPool -Name $appPoolName -ErrorAction SilentlyContinue
+              
+              # Wait for pool to stop
+              $timeout = 30
+              $elapsed = 0
+              while ((Get-WebAppPool -Name $appPoolName).State -ne "Stopped" -and $elapsed -lt $timeout) {
+                Start-Sleep -Seconds 1
+                $elapsed++
+              }
+              if ($elapsed -ge $timeout) {
+                Write-Warning "Application pool '$appPoolName' did not stop within $timeout seconds. Current state: $((Get-WebAppPool -Name $appPoolName).State)"
+              }
+            } else {
+              Write-Host "Creating new Application Pool: $appPoolName"
+              New-WebAppPool -Name $appPoolName
+            }
+            
+            # Configure Application Pool (WebAdministration style settings)
+            Write-Host "Configuring Application Pool settings using WebAdministration..."
+            
+            # .NET Core settings
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "managedRuntimeVersion" -Value ""
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "enable32BitAppOnWin64" -Value $false
+            
+            # Process Model settings
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.identityType" -Value "ApplicationPoolIdentity"
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.loadUserProfile" -Value $true
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.idleTimeout" -Value "00:00:00"
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.maxProcesses" -Value 1
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingingEnabled" -Value $true
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingInterval" -Value "00:00:30"
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingResponseTime" -Value "00:01:30"
+            
+            # Recycling settings
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "recycling.periodicRestart.time" -Value "00:00:00"
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "recycling.periodicRestart.schedule" -Value @()
+            
+            # Failure settings
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtection" -Value $true
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtectionInterval" -Value "00:05:00"
+            Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtectionMaxCrashes" -Value 5
+            
+            # Start the application pool
+            Start-WebAppPool -Name $appPoolName
+            Write-Host "[SUCCESS] Application Pool '$appPoolName' configured and started using WebAdministration" -ForegroundColor Green
           }
-          
-          # Configure Application Pool (Azure DevOps style settings)
-          Write-Host "Configuring Application Pool settings..."
-          
-          # .NET Core settings
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "managedRuntimeVersion" -Value ""
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "enable32BitAppOnWin64" -Value $false
-          
-          # Process Model settings
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.identityType" -Value "ApplicationPoolIdentity"
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.loadUserProfile" -Value $true
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.idleTimeout" -Value "00:00:00"
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.maxProcesses" -Value 1
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingingEnabled" -Value $true
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingInterval" -Value "00:00:30"
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "processModel.pingResponseTime" -Value "00:01:30"
-          
-          # Recycling settings
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "recycling.periodicRestart.time" -Value "00:00:00"
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "recycling.periodicRestart.schedule" -Value @()
-          
-          # Failure settings
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtection" -Value $true
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtectionInterval" -Value "00:05:00"
-          Set-ItemProperty -Path "IIS:\AppPools\$appPoolName" -Name "failure.rapidFailProtectionMaxCrashes" -Value 5
-          
-          # Start the application pool
-          Start-WebAppPool -Name $appPoolName
-          Write-Host "[SUCCESS] Application Pool '$appPoolName' configured and started" -ForegroundColor Green
           
         } catch {
           Write-Error "Application Pool management failed: $($_.Exception.Message)"
@@ -393,70 +480,119 @@ jobs:
         # IIS Website Management
         Write-Host "Managing IIS Website: $siteName" -ForegroundColor Yellow
         try {
-          $websiteExists = Get-Website -Name $siteName -ErrorAction SilentlyContinue
-          
-          if ($websiteExists) {
-            Write-Host "Website '$siteName' exists. Stopping for reconfiguration..."
-            Stop-Website -Name $siteName -ErrorAction SilentlyContinue
+          if ($env:USE_APPCMD -eq "true") {
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
             
-            # Wait for site to stop
-            $timeout = 30
-            $elapsed = 0
-            while ((Get-Website -Name $siteName).State -ne "Stopped" -and $elapsed -lt $timeout) {
-              Start-Sleep -Seconds 1
-              $elapsed++
-            }
-            if ($elapsed -ge $timeout) {
-              Write-Warning "Website '$siteName' did not stop within $timeout seconds. Current state: $((Get-Website -Name $siteName).State)"
+            # Check if website exists using appcmd
+            $websiteExists = $false
+            try {
+              $result = & $appcmdPath list site $siteName 2>$null
+              $websiteExists = $result -and $result.Length -gt 0
+            } catch {
+              $websiteExists = $false
             }
             
-            # Remove existing bindings
-            Write-Host "Removing existing bindings..."
-            Get-WebBinding -Name $siteName | Remove-WebBinding
+            if ($websiteExists) {
+              Write-Host "Website '$siteName' exists. Stopping for reconfiguration..."
+              & $appcmdPath stop site $siteName
+              Start-Sleep -Seconds 3
+              
+              # Update website configuration
+              Write-Host "Updating website configuration using appcmd..."
+              & $appcmdPath set site $siteName /physicalPath:$sitePath
+              & $appcmdPath set site $siteName /applicationDefaults.applicationPool:$appPoolName
+            } else {
+              Write-Host "Creating new Website: $siteName using appcmd..."
+              & $appcmdPath add site /name:$siteName /physicalPath:$sitePath /bindings:http/*:80:
+              & $appcmdPath set site $siteName /applicationDefaults.applicationPool:$appPoolName
+            }
             
-            # Update website configuration
-            Write-Host "Updating website configuration..."
-            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "physicalPath" -Value $sitePath
-            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "applicationPool" -Value $appPoolName
+            # Configure Website Bindings using appcmd
+            Write-Host "Configuring website bindings using appcmd..."
+            
+            # Additional environment-specific bindings
+            $environment = "${{ inputs.environment || 'production' }}"
+            if ($environment -eq "production") {
+              # Production: Add domain-specific HTTP binding
+              Write-Host "Adding production HTTP binding for phongmx.org..."
+              & $appcmdPath set site $siteName /+bindings.[protocol='http',bindingInformation='*:80:phongmx.org']
+            } elseif ($environment -eq "staging") {
+              # Staging: Add staging subdomain binding
+              Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
+              & $appcmdPath set site $siteName /+bindings.[protocol='http',bindingInformation='*:80:staging.phongmx.org']
+            }
+            
+            # Start the website
+            & $appcmdPath start site $siteName
+            Write-Host "[SUCCESS] Website '$siteName' configured and started using appcmd" -ForegroundColor Green
             
           } else {
-            Write-Host "Creating new Website: $siteName"
-            New-Website -Name $siteName -PhysicalPath $sitePath -ApplicationPool $appPoolName
-          }
-          
-          # Configure Website Bindings (Azure DevOps style)
-          Write-Host "Configuring website bindings..."
-          
-          # HTTP Binding (Port 80)
-          if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -ErrorAction SilentlyContinue)) {
-            Write-Host "Adding HTTP binding (Port 80)..."
-            New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http"
-          }
-          
-          # Additional environment-specific bindings
-          $environment = "${{ inputs.environment || 'production' }}"
-          if ($environment -eq "production") {
-            # Production: Add domain-specific HTTP binding
-            if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "phongmx.org" -ErrorAction SilentlyContinue)) {
-              Write-Host "Adding production HTTP binding for phongmx.org..."
-              New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "phongmx.org"
+            # Use WebAdministration module
+            $websiteExists = Get-Website -Name $siteName -ErrorAction SilentlyContinue
+            
+            if ($websiteExists) {
+              Write-Host "Website '$siteName' exists. Stopping for reconfiguration..."
+              Stop-Website -Name $siteName -ErrorAction SilentlyContinue
+              
+              # Wait for site to stop
+              $timeout = 30
+              $elapsed = 0
+              while ((Get-Website -Name $siteName).State -ne "Stopped" -and $elapsed -lt $timeout) {
+                Start-Sleep -Seconds 1
+                $elapsed++
+              }
+              if ($elapsed -ge $timeout) {
+                Write-Warning "Website '$siteName' did not stop within $timeout seconds. Current state: $((Get-Website -Name $siteName).State)"
+              }
+              
+              # Remove existing bindings
+              Write-Host "Removing existing bindings..."
+              Get-WebBinding -Name $siteName | Remove-WebBinding
+              
+              # Update website configuration
+              Write-Host "Updating website configuration..."
+              Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "physicalPath" -Value $sitePath
+              Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "applicationPool" -Value $appPoolName
+              
+            } else {
+              Write-Host "Creating new Website: $siteName"
+              New-Website -Name $siteName -PhysicalPath $sitePath -ApplicationPool $appPoolName
             }
-          } elseif ($environment -eq "staging") {
-            # Staging: Add staging subdomain binding
-            if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org" -ErrorAction SilentlyContinue)) {
-              Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
-              New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org"
+            
+            # Configure Website Bindings (WebAdministration style)
+            Write-Host "Configuring website bindings..."
+            
+            # HTTP Binding (Port 80)
+            if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -ErrorAction SilentlyContinue)) {
+              Write-Host "Adding HTTP binding (Port 80)..."
+              New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http"
             }
+            
+            # Additional environment-specific bindings
+            $environment = "${{ inputs.environment || 'production' }}"
+            if ($environment -eq "production") {
+              # Production: Add domain-specific HTTP binding
+              if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "phongmx.org" -ErrorAction SilentlyContinue)) {
+                Write-Host "Adding production HTTP binding for phongmx.org..."
+                New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "phongmx.org"
+              }
+            } elseif ($environment -eq "staging") {
+              # Staging: Add staging subdomain binding
+              if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org" -ErrorAction SilentlyContinue)) {
+                Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
+                New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org"
+              }
+            }
+            
+            # Website configuration
+            Write-Host "Applying website configuration..."
+            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "serverAutoStart" -Value $true
+            Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "preloadEnabled" -Value $false
+            
+            # Start the website
+            Start-Website -Name $siteName
+            Write-Host "[SUCCESS] Website '$siteName' configured and started using WebAdministration" -ForegroundColor Green
           }
-          
-          # Website configuration
-          Write-Host "Applying website configuration..."
-          Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "serverAutoStart" -Value $true
-          Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "preloadEnabled" -Value $false
-          
-          # Start the website
-          Start-Website -Name $siteName
-          Write-Host "[SUCCESS] Website '$siteName' configured and started" -ForegroundColor Green
           
         } catch {
           Write-Error "Website management failed: $($_.Exception.Message)"
@@ -466,14 +602,19 @@ jobs:
         # Virtual Directory and Application Management (Azure DevOps style)
         Write-Host "Configuring Virtual Applications..." -ForegroundColor Yellow
         try {
-          # Ensure the main application is properly configured
-          $appPath = "/"
-          $virtualApp = Get-WebApplication -Site $siteName -Name "" -ErrorAction SilentlyContinue
-          
-          if ($virtualApp) {
-            Write-Host "Updating main application configuration..."
-            Set-ItemProperty -Path "IIS:\Sites\$siteName\$appPath" -Name "physicalPath" -Value $sitePath
-            Set-ItemProperty -Path "IIS:\Sites\$siteName\$appPath" -Name "applicationPool" -Value $appPoolName
+          if ($env:USE_APPCMD -ne "true") {
+            # Only do this if WebAdministration module is available
+            # Ensure the main application is properly configured
+            $appPath = "/"
+            $virtualApp = Get-WebApplication -Site $siteName -Name "" -ErrorAction SilentlyContinue
+            
+            if ($virtualApp) {
+              Write-Host "Updating main application configuration..."
+              Set-ItemProperty -Path "IIS:\Sites\$siteName\$appPath" -Name "physicalPath" -Value $sitePath
+              Set-ItemProperty -Path "IIS:\Sites\$siteName\$appPath" -Name "applicationPool" -Value $appPoolName
+            }
+          } else {
+            Write-Host "Virtual application configuration handled by appcmd site creation"
           }
           
           Write-Host "[SUCCESS] Virtual application configuration completed" -ForegroundColor Green
@@ -485,30 +626,47 @@ jobs:
         # Display final configuration summary (Azure DevOps style)
         Write-Host "=== IIS CONFIGURATION SUMMARY ===" -ForegroundColor Cyan
         try {
-          $appPool = Get-WebAppPool -Name $appPoolName
-          $website = Get-Website -Name $siteName
-          $bindings = Get-WebBinding -Name $siteName
-          
-          Write-Host "Application Pool Details:" -ForegroundColor White
-          Write-Host "  Name: $($appPool.Name)"
-          Write-Host "  State: $($appPool.State)"
-          Write-Host "  .NET Version: $($appPool.managedRuntimeVersion)"
-          Write-Host "  Identity: $($appPool.processModel.identityType)"
-          
-          Write-Host "Website Details:" -ForegroundColor White
-          Write-Host "  Name: $($website.Name)"
-          Write-Host "  State: $($website.State)"
-          Write-Host "  Physical Path: $($website.physicalPath)"
-          Write-Host "  Application Pool: $($website.applicationPool)"
-          
-          Write-Host "Bindings:" -ForegroundColor White
-          foreach ($binding in $bindings) {
-            $hostHeader = if ($binding.bindingInformation.Contains(":")) { 
-              $binding.bindingInformation.Split(":")[-1] 
-            } else { 
-              "*" 
+          if ($env:USE_APPCMD -eq "true") {
+            # Use appcmd for summary
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+            
+            Write-Host "Application Pool Details:" -ForegroundColor White
+            Write-Host "  Name: $appPoolName"
+            $appPoolInfo = & $appcmdPath list apppool $appPoolName
+            Write-Host "  $appPoolInfo"
+            
+            Write-Host "Website Details:" -ForegroundColor White
+            Write-Host "  Name: $siteName"
+            $siteInfo = & $appcmdPath list site $siteName
+            Write-Host "  $siteInfo"
+            
+          } else {
+            # Use WebAdministration module
+            $appPool = Get-WebAppPool -Name $appPoolName
+            $website = Get-Website -Name $siteName
+            $bindings = Get-WebBinding -Name $siteName
+            
+            Write-Host "Application Pool Details:" -ForegroundColor White
+            Write-Host "  Name: $($appPool.Name)"
+            Write-Host "  State: $($appPool.State)"
+            Write-Host "  .NET Version: $($appPool.managedRuntimeVersion)"
+            Write-Host "  Identity: $($appPool.processModel.identityType)"
+            
+            Write-Host "Website Details:" -ForegroundColor White
+            Write-Host "  Name: $($website.Name)"
+            Write-Host "  State: $($website.State)"
+            Write-Host "  Physical Path: $($website.physicalPath)"
+            Write-Host "  Application Pool: $($website.applicationPool)"
+            
+            Write-Host "Bindings:" -ForegroundColor White
+            foreach ($binding in $bindings) {
+              $hostHeader = if ($binding.bindingInformation.Contains(":")) { 
+                $binding.bindingInformation.Split(":")[-1] 
+              } else { 
+                "*" 
+              }
+              Write-Host "  $($binding.protocol)://$hostHeader`:$($binding.bindingInformation.Split(":")[-2])"
             }
-            Write-Host "  $($binding.protocol)://$hostHeader`:$($binding.bindingInformation.Split(":")[-2])"
           }
           
         } catch {
@@ -539,8 +697,6 @@ jobs:
         }
         
         try {
-          Import-Module WebAdministration -ErrorAction Stop
-          
           # Import certificate
           $passwordSecure = ConvertTo-SecureString -String $pfxPassword -AsPlainText -Force
           $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\LocalMachine\My" -Password $passwordSecure
@@ -548,24 +704,50 @@ jobs:
           
           Write-Host "[SUCCESS] Imported SSL certificate for '$hostname' with thumbprint: $thumbprint" -ForegroundColor Green
           
-          # Get existing binding
-          $existingBinding = Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" -ErrorAction SilentlyContinue
-          
-          if ($existingBinding) {
-            Write-Host "Found existing HTTPS binding for '$hostname'. Removing it before creating a new one."
-            $existingBinding | Remove-WebBinding
+          if ($env:USE_APPCMD -eq "true") {
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+            
+            # Remove existing HTTPS binding if it exists
+            Write-Host "Removing existing HTTPS binding for '$hostname' if it exists..."
+            try {
+              & $appcmdPath delete binding /site.name:"$siteName" /binding.protocol:https /binding.bindingInformation:"*:443:$hostname" 2>$null
+            } catch {
+              # Ignore if binding doesn't exist
+            }
+            
+            # Create new HTTPS binding
+            Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName' using appcmd..."
+            & $appcmdPath set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:443:$hostname"]
+            
+            # Assign certificate using netsh (since appcmd doesn't handle SSL cert assignment directly)
+            Write-Host "Assigning SSL certificate using netsh..."
+            netsh http add sslcert hostnameport="$hostname`:443" certhash=$thumbprint appid="{$([System.Guid]::NewGuid().ToString())}" certstorename=MY
+            
+            Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using appcmd." -ForegroundColor Green
+            
+          } else {
+            # Use WebAdministration module
+            Import-Module WebAdministration -ErrorAction Stop
+            
+            # Get existing binding
+            $existingBinding = Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" -ErrorAction SilentlyContinue
+            
+            if ($existingBinding) {
+              Write-Host "Found existing HTTPS binding for '$hostname'. Removing it before creating a new one."
+              $existingBinding | Remove-WebBinding
+            }
+            
+            # Create new binding
+            Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName'..."
+            New-WebBinding -Name $siteName -IPAddress "*" -Port 443 -HostName $hostname -Protocol "https" -SslFlags 1
+            
+            # Assign certificate to the binding
+            Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" | ForEach-Object {
+              $_.AddSslCertificate($thumbprint, "my")
+            }
+            
+            Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using WebAdministration." -ForegroundColor Green
           }
-          
-          # Create new binding
-          Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName'..."
-          New-WebBinding -Name $siteName -IPAddress "*" -Port 443 -HostName $hostname -Protocol "https" -SslFlags 1
-          
-          # Assign certificate to the binding
-          Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" | ForEach-Object {
-            $_.AddSslCertificate($thumbprint, "my")
-          }
-          
-          Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443." -ForegroundColor Green
           
         } catch {
           Write-Error "Failed to configure SSL certificate: $($_.Exception.Message)"
@@ -673,18 +855,31 @@ jobs:
           Write-Host "Web Deploy methods failed, falling back to file copy..."
           
           # Stop IIS services
-          Import-Module WebAdministration -ErrorAction SilentlyContinue
-          Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-          Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 3
+          if ($env:USE_APPCMD -eq "true") {
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+            & $appcmdPath stop apppool "${{ env.IIS_APP_POOL }}"
+            & $appcmdPath stop site "$siteName"
+            Start-Sleep -Seconds 3
+          } else {
+            Import-Module WebAdministration -ErrorAction SilentlyContinue
+            Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
+            Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+          }
           
           # Copy files
           $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
           Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
           
           # Start IIS services
-          Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
-          Start-Website -Name "$siteName"
+          if ($env:USE_APPCMD -eq "true") {
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+            & $appcmdPath start apppool "${{ env.IIS_APP_POOL }}"
+            & $appcmdPath start site "$siteName"
+          } else {
+            Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
+            Start-Website -Name "$siteName"
+          }
           
           Write-Host "[SUCCESS] Fallback file copy deployment completed"
           $deploymentSuccess = $true
