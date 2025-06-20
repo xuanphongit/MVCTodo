@@ -266,64 +266,6 @@ jobs:
           Write-Warning "Package creation failed: $($_.Exception.Message)"
         }
 
-    - name: Create backup
-      shell: powershell
-      run: |
-        Write-Host "=== CREATING BACKUP ===" -ForegroundColor Yellow
-        
-        $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-        $backupDir = "${{ env.BACKUP_PATH }}\${timestamp}-${{ github.sha }}"
-        
-        try {
-          # Ensure backup directory exists
-          if (!(Test-Path ${{ env.BACKUP_PATH }})) {
-            New-Item -ItemType Directory -Path ${{ env.BACKUP_PATH }} -Force | Out-Null
-            Write-Host "Created backup root directory: ${{ env.BACKUP_PATH }}"
-          }
-          
-          # Create backup if current deployment exists
-          if (Test-Path ${{ env.IIS_SITE_PATH }}) {
-            Write-Host "Creating backup of current deployment..."
-            New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-            
-            # Copy current deployment with error handling
-            robocopy "${{ env.IIS_SITE_PATH }}" "$backupDir" /E /R:3 /W:5 /MT:8 /XD logs temp /XF *.log *.tmp
-            
-            # Robocopy exit codes 0-7 are success (8+ are errors)
-            if ($LASTEXITCODE -le 7) {
-              Write-Host "[SUCCESS] Backup created: $backupDir" -ForegroundColor Green
-              
-              # Save backup info for potential rollback
-              @{
-                BackupPath = $backupDir
-                Timestamp = $timestamp
-                Commit = "${{ github.sha }}"
-                Environment = "${{ inputs.environment || 'production' }}"
-              } | ConvertTo-Json | Out-File "$backupDir\backup-info.json"
-              
-            } else {
-              Write-Warning "Backup creation had issues (exit code: $LASTEXITCODE)"
-            }
-            
-            # Clean up old backups (keep last 10)
-            $oldBackups = Get-ChildItem -Path ${{ env.BACKUP_PATH }} -Directory | 
-                         Sort-Object CreationTime -Descending | 
-                         Select-Object -Skip 10
-            
-            if ($oldBackups) {
-              Write-Host "Cleaning up $($oldBackups.Count) old backup(s)..."
-              $oldBackups | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-            }
-            
-          } else {
-            Write-Host "[INFO] No existing deployment found - skipping backup"
-          }
-          
-        } catch {
-          Write-Warning "Backup creation failed: $($_.Exception.Message)"
-          Write-Host "Deployment will continue without backup"
-        }
-
     # ================================
     # IIS SITE AND APPLICATION POOL SETUP
     # ================================
