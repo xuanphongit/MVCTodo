@@ -101,7 +101,7 @@ jobs:
 
         if (Test-Path $msdeployPath) {
             Write-Host "[OK] Web Deploy V3 found at: $msdeployPath" -ForegroundColor Green
-            $env:MSDEPLOY_PATH = $msdeployPath
+            echo "MSDEPLOY_PATH=$msdeployPath" >> $env:GITHUB_ENV
         } else {
             Write-Error "[ERROR] Web Deploy V3 not found!"
             throw "Web Deploy V3 not found"
