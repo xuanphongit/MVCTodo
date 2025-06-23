@@ -960,13 +960,7 @@ jobs:
 
     - name: Deploy Application
       shell: powershell
-      timeout-minutes: 15
-      continue-on-error: false
       run: |
-        # Reset error action preference to continue on non-terminating errors
-        $ErrorActionPreference = "Continue"
-        Write-Host "=== DEPLOYING APPLICATION ===" -ForegroundColor Yellow
-        
         $deploymentSuccess = $false
         $msdeployPath = $env:MSDEPLOY_PATH
         $siteName = "${{ env.IIS_SITE_NAME }}"
@@ -1172,46 +1166,3 @@ jobs:
           }
           throw "All deployment methods failed"
         }
-
-    - name: Post-Deployment Validation
-      shell: powershell
-      if: always()
-      run: |
-        Write-Host "=== POST-DEPLOYMENT VALIDATION ===" -ForegroundColor Yellow
-        
-        $targetPath = "${{ env.IIS_SITE_PATH }}"
-        $siteName = "${{ env.IIS_SITE_NAME }}"
-        
-        # Check if deployment directory exists and has files
-        if (Test-Path $targetPath) {
-          $deployedFiles = Get-ChildItem -Path $targetPath -Recurse -File -ErrorAction SilentlyContinue
-          Write-Host "✓ Deployment directory exists: $targetPath" -ForegroundColor Green
-          Write-Host "✓ Total files deployed: $($deployedFiles.Count)" -ForegroundColor Green
-        } else {
-          Write-Host "✗ Deployment directory not found: $targetPath" -ForegroundColor Red
-        }
-        
-        # Check IIS site status
-        try {
-          if ($env:USE_APPCMD -eq "true") {
-            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-            $siteInfo = & $appcmdPath list site "$siteName" 2>$null
-            if ($siteInfo) {
-              Write-Host "✓ IIS Site '$siteName' is configured" -ForegroundColor Green
-            } else {
-              Write-Host "✗ IIS Site '$siteName' not found" -ForegroundColor Red
-            }
-          } else {
-            Import-Module WebAdministration -ErrorAction SilentlyContinue
-            $site = Get-Website -Name "$siteName" -ErrorAction SilentlyContinue
-            if ($site) {
-              Write-Host "✓ IIS Site '$siteName' status: $($site.State)" -ForegroundColor Green
-            } else {
-              Write-Host "✗ IIS Site '$siteName' not found" -ForegroundColor Red
-            }
-          }
-        } catch {
-          Write-Host "⚠ Could not check IIS site status: $($_.Exception.Message)" -ForegroundColor Yellow
-        }
-        
-        Write-Host "[INFO] Deployment validation completed" -ForegroundColor Cyan
