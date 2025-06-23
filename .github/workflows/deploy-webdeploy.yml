@@ -758,11 +758,22 @@ jobs:
             # Assign certificate using netsh (since appcmd doesn't handle SSL cert assignment directly)
             Write-Host "Assigning SSL certificate using netsh..."
             $appId = "{$([System.Guid]::NewGuid().ToString())}"
+            
+            # Try to add the SSL certificate binding
+            Write-Host "Adding SSL certificate binding for $hostname`:443..."
             netsh http add sslcert hostnameport="$hostname`:443" certhash=$thumbprint appid=$appId certstorename=MY
             
             if ($LASTEXITCODE -ne 0) {
               Write-Warning "Host-based SSL binding failed, trying IP-based binding as fallback"
               netsh http add sslcert ipport="0.0.0.0:443" certhash=$thumbprint appid=$appId certstorename=MY
+              
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] SSL certificate assigned using IP-based binding" -ForegroundColor Green
+              } else {
+                Write-Warning "Both hostname and IP-based SSL certificate binding failed. SSL may not work properly."
+              }
+            } else {
+              Write-Host "[SUCCESS] SSL certificate assigned using hostname binding" -ForegroundColor Green
             }
             
             Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using appcmd." -ForegroundColor Green
@@ -831,6 +842,7 @@ jobs:
               
               # Use netsh as fallback for certificate assignment
               $appId = "{$([System.Guid]::NewGuid().ToString())}"
+              Write-Host "Adding SSL certificate binding for $hostname`:443 using netsh..."
               netsh http add sslcert hostnameport="$hostname`:443" certhash=$thumbprint appid=$appId certstorename=MY
               
               if ($LASTEXITCODE -eq 0) {
@@ -839,6 +851,12 @@ jobs:
                 # Try IP-based binding as final fallback
                 Write-Warning "Host-based SSL binding failed, trying IP-based binding"
                 netsh http add sslcert ipport="0.0.0.0:443" certhash=$thumbprint appid=$appId certstorename=MY
+                
+                if ($LASTEXITCODE -eq 0) {
+                  Write-Host "[SUCCESS] SSL certificate assigned using IP-based binding" -ForegroundColor Green
+                } else {
+                  Write-Warning "Both hostname and IP-based SSL certificate binding failed. SSL may not work properly."
+                }
               }
             }
             
@@ -847,7 +865,8 @@ jobs:
           
         } catch {
           Write-Error "Failed to configure SSL certificate: $($_.Exception.Message)"
-          throw
+          Write-Warning "SSL certificate configuration failed, but continuing with deployment. HTTPS may not be available."
+          # Don't throw here to allow deployment to continue without SSL
         }
 
     # ================================
