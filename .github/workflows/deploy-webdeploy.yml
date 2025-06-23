@@ -312,6 +312,71 @@ jobs:
         }
 
     # ================================
+    # SSL CERTIFICATE IMPORT
+    # ================================
+    - name: Import SSL Certificate
+      shell: powershell
+      run: |
+        Write-Host "=== IMPORTING SSL CERTIFICATE ===" -ForegroundColor Yellow
+        
+        $pfxPath = ".\.github\workflows\key\origin.pfx"
+        $pfxPassword = $env:PFX_PASSWORD
+        $hostname = "phongmx.org"
+        
+        # Check if certificate file exists
+        if (Test-Path $pfxPath) {
+          Write-Host "[INFO] Found SSL certificate file: $pfxPath" -ForegroundColor Green
+          
+          if (-not $pfxPassword) {
+            Write-Warning "PFX_PASSWORD secret is not set. Cannot import PFX certificate."
+            Write-Host "Will use existing certificate from certificate store if available" -ForegroundColor Yellow
+          } else {
+            # Import certificate from PFX file
+            try {
+              Write-Host "Importing SSL certificate from PFX file..." -ForegroundColor Cyan
+              $passwordSecure = ConvertTo-SecureString -String $pfxPassword -AsPlainText -Force
+              $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\LocalMachine\My" -Password $passwordSecure
+              $thumbprint = $cert.Thumbprint
+              
+              Write-Host "[SUCCESS] Imported SSL certificate from PFX: $thumbprint" -ForegroundColor Green
+              Write-Host "Subject: $($cert.Subject)" -ForegroundColor Cyan
+              Write-Host "Expires: $($cert.NotAfter)" -ForegroundColor Cyan
+              Write-Host "DNS Names: $($cert.DnsNameList -join ', ')" -ForegroundColor Cyan
+              
+              # Store thumbprint for later use
+              echo "SSL_CERT_THUMBPRINT=$thumbprint" >> $env:GITHUB_ENV
+              echo "SSL_CERT_IMPORTED=true" >> $env:GITHUB_ENV
+              
+            } catch {
+              Write-Error "Failed to import PFX certificate: $($_.Exception.Message)"
+              Write-Host "Will attempt to use existing certificate from certificate store" -ForegroundColor Yellow
+              echo "SSL_CERT_IMPORTED=false" >> $env:GITHUB_ENV
+            }
+          }
+        } else {
+          Write-Warning "SSL certificate file not found at '$pfxPath'"
+          Write-Host "Will attempt to use existing certificate from certificate store" -ForegroundColor Yellow
+          echo "SSL_CERT_IMPORTED=false" >> $env:GITHUB_ENV
+        }
+        
+        # Check what certificates are available in the certificate store
+        Write-Host ""
+        Write-Host "Available certificates in LocalMachine\My store:" -ForegroundColor Cyan
+        try {
+          $allCerts = Get-ChildItem -Path "Cert:\LocalMachine\My"
+          foreach ($certItem in $allCerts) {
+            $dnsNames = if ($certItem.DnsNameList) { $certItem.DnsNameList -join ', ' } else { "None" }
+            Write-Host "  Subject: $($certItem.Subject)" -ForegroundColor White
+            Write-Host "  Thumbprint: $($certItem.Thumbprint)" -ForegroundColor Gray
+            Write-Host "  DNS Names: $dnsNames" -ForegroundColor Gray
+            Write-Host "  Expires: $($certItem.NotAfter)" -ForegroundColor Gray
+            Write-Host ""
+          }
+        } catch {
+          Write-Warning "Could not list certificates: $($_.Exception.Message)"
+        }
+
+    # ================================
     # IIS SITE AND APPLICATION POOL SETUP
     # ================================
     - name: Setup IIS Application Pool and Website
@@ -725,27 +790,41 @@ jobs:
     - name: Configure SSL Certificate
       shell: powershell
       run: |
-        Write-Host "=== CONFIGURING SSL CERTIFICATE ===" -ForegroundColor Yellow
+        Write-Host "=== BINDING SSL CERTIFICATE TO IIS ===" -ForegroundColor Yellow
         
-        $pfxPath = ".\.github\workflows\key\origin.pfx"
-        $pfxPassword = $env:PFX_PASSWORD
         $environment = "${{ inputs.environment || 'production' }}"
-        $hostname =  "phongmx.org"
+        $hostname = "phongmx.org"
         $siteName = "${{ env.IIS_SITE_NAME }}"
         
-        if (-not (Test-Path $pfxPath)) {
-          Write-Warning "SSL certificate file not found at '$pfxPath'."
-          Write-Host "Attempting to use existing certificate from certificate store..." -ForegroundColor Yellow
-          
-          # Try to find existing certificate that can be used
-          $existingCert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { 
-            $_.Subject -like "*$hostname*" -or $_.Subject -like "*localhost*" 
+        # Check if we have an imported certificate
+        $cert = $null
+        $thumbprint = $null
+        
+        if ($env:SSL_CERT_THUMBPRINT -and $env:SSL_CERT_IMPORTED -eq "true") {
+          $thumbprint = $env:SSL_CERT_THUMBPRINT
+          $cert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { $_.Thumbprint -eq $thumbprint }
+          if ($cert) {
+            Write-Host "[INFO] Using imported certificate: $thumbprint" -ForegroundColor Green
+            Write-Host "Subject: $($cert.Subject)" -ForegroundColor Cyan
+          }
+        }
+        
+        # If no imported certificate, find existing one
+        if (-not $cert) {
+          Write-Host "Looking for existing certificate in certificate store..." -ForegroundColor Cyan
+          $cert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { 
+            $_.Subject -like "*$hostname*" -or 
+            $_.DnsNameList -contains $hostname -or
+            $_.Subject -like "*localhost*" 
+          } | Sort-Object { 
+            # Prioritize domain-specific certificates
+            if ($_.Subject -like "*$hostname*" -or $_.DnsNameList -contains $hostname) { 0 } 
+            else { 1 }
           } | Select-Object -First 1
           
-          if ($existingCert) {
-            $cert = $existingCert
+          if ($cert) {
             $thumbprint = $cert.Thumbprint
-            Write-Host "[INFO] Found existing certificate: $thumbprint" -ForegroundColor Green
+            Write-Host "[INFO] Found certificate: $thumbprint" -ForegroundColor Green
             Write-Host "Subject: $($cert.Subject)" -ForegroundColor Cyan
             Write-Host "Expires: $($cert.NotAfter)" -ForegroundColor Cyan
             if ($cert.Subject -like "*localhost*") {
@@ -755,35 +834,6 @@ jobs:
             Write-Warning "No suitable certificate found in certificate store. Skipping SSL configuration."
             Write-Host "To fix this: Run .\fix-ssl-certificate.ps1 as Administrator after deployment" -ForegroundColor Yellow
             exit 0
-          }
-        } else {
-          if (-not $pfxPassword) {
-            Write-Warning "PFX_PASSWORD secret is not set. Skipping SSL configuration."
-            exit 0
-          }
-          
-          # Import certificate from PFX file
-          try {
-            $passwordSecure = ConvertTo-SecureString -String $pfxPassword -AsPlainText -Force
-            $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\LocalMachine\My" -Password $passwordSecure
-            $thumbprint = $cert.Thumbprint
-            Write-Host "[SUCCESS] Imported SSL certificate from PFX: $thumbprint" -ForegroundColor Green
-          } catch {
-            Write-Error "Failed to import PFX certificate: $($_.Exception.Message)"
-            Write-Host "Attempting to use existing certificate from certificate store..." -ForegroundColor Yellow
-            
-            $existingCert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { 
-              $_.Subject -like "*$hostname*" -or $_.Subject -like "*localhost*" 
-            } | Select-Object -First 1
-            
-            if ($existingCert) {
-              $cert = $existingCert
-              $thumbprint = $cert.Thumbprint
-              Write-Host "[FALLBACK] Using existing certificate: $thumbprint" -ForegroundColor Yellow
-            } else {
-              Write-Warning "No suitable certificate found. Skipping SSL configuration."
-              exit 0
-            }
           }
         }
         
