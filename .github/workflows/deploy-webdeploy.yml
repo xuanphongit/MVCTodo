@@ -941,7 +941,10 @@ jobs:
     - name: Deploy Application
       shell: powershell
       timeout-minutes: 15
+      continue-on-error: false
       run: |
+        # Reset error action preference to continue on non-terminating errors
+        $ErrorActionPreference = "Continue"
         Write-Host "=== DEPLOYING APPLICATION ===" -ForegroundColor Yellow
         
         $deploymentSuccess = $false
@@ -999,25 +1002,30 @@ jobs:
           Write-Host "Attempting package deployment..."
           $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
           
-          & "$msdeployPath" `
-            -verb:sync `
-            -source:package="$absolutePackagePath" `
-            -dest:iisApp="$siteName",computerName=localhost `
-            -setParamFile:"$setParamFile" `
-            -enableRule:AppOffline `
-            -enableRule:DoNotDeleteRule `
-            -allowUntrusted:true `
-            -verbose
-            
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] Package deployment completed successfully"
-            $deploymentSuccess = $true
-          } else {
-            Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE"
-            Write-Host "Package deployment details:" -ForegroundColor Yellow
-            Write-Host "- Package path: $absolutePackagePath"
-            Write-Host "- Site name: $siteName"
-            Write-Host "- Parameter file: $setParamFile"
+          try {
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:package="$absolutePackagePath" `
+              -dest:iisApp="$siteName",computerName=localhost `
+              -setParamFile:"$setParamFile" `
+              -enableRule:AppOffline `
+              -enableRule:DoNotDeleteRule `
+              -allowUntrusted:true `
+              -verbose 2>&1 | Out-String -Stream | ForEach-Object { Write-Host $_ }
+              
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Package deployment completed successfully" -ForegroundColor Green
+              $deploymentSuccess = $true
+            } else {
+              Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE"
+              Write-Host "Package deployment details:" -ForegroundColor Yellow
+              Write-Host "- Package path: $absolutePackagePath"
+              Write-Host "- Site name: $siteName"
+              Write-Host "- Parameter file: $setParamFile"
+              Write-Warning "Attempting folder sync as fallback."
+            }
+          } catch {
+            Write-Warning "[WARNING] Package deployment failed with exception: $($_.Exception.Message)"
             Write-Warning "Attempting folder sync as fallback."
           }
         }
@@ -1158,6 +1166,11 @@ jobs:
         
         if ($deploymentSuccess) {
           Write-Host "[SUCCESS] Application deployment completed successfully" -ForegroundColor Green
+          
+          # Reset any previous error conditions since deployment ultimately succeeded
+          $global:LASTEXITCODE = 0
+          $Error.Clear()
+          
         } else {
           Write-Error "All deployment methods failed."
           Write-Host "Deployment troubleshooting information:" -ForegroundColor Yellow
@@ -1165,7 +1178,7 @@ jobs:
           Write-Host "- Target path: $targetPath (exists: $(Test-Path $targetPath))" 
           Write-Host "- Package path: $packagePath (exists: $(Test-Path $packagePath))"
           Write-Host "- MSDeploy path: $msdeployPath (exists: $(Test-Path $msdeployPath))"
-          Write-Host "- Parameter file: $setParamFile (exists: $(Test-Path $setParamFile))"
+          Write-Host "- Parameter file: $setParamFile (exists: $(if($setParamFile){Test-Path $setParamFile}else{'N/A'}))"
           throw "All deployment methods failed."
         }
 
