@@ -983,8 +983,6 @@ jobs:
     - name: Deploy Application
       shell: powershell
       run: |
-          Write-Host "=== DEPLOYING APPLICATION ===" -ForegroundColor Yellow
-          
           $deploymentSuccess = $false
           $msdeployPath = $env:MSDEPLOY_PATH
           $siteName = "${{ env.IIS_SITE_NAME }}"
@@ -994,7 +992,6 @@ jobs:
           $packagePath = Join-Path $packageDir "TodoApp.zip"
           $method = "package"
           $environment = "production"
-
           # Try to find setParameters file in multiple locations
           $setParamFile = "parameters/setParameters.xml"
           
@@ -1007,7 +1004,6 @@ jobs:
           Write-Host "- Package: $packagePath (exists: $(Test-Path $packagePath))"
           Write-Host "- Parameter file: $setParamFile (exists: $(Test-Path $setParamFile))"
           Write-Host "- msdeploy path: $msdeployPath (exists: $(Test-Path $msdeployPath))"
-
           # Verify prerequisites
           if (!(Test-Path $sourcePath)) {
             throw "Source path does not exist: $sourcePath"
@@ -1031,20 +1027,9 @@ jobs:
             New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
             icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
           }
-
-          # Setup custom temp directory to avoid permissions issues
-          $customTempDir = Join-Path (Get-Location) "temp-webdeploy"
-          if (!(Test-Path $customTempDir)) {
-            New-Item -ItemType Directory -Path $customTempDir -Force | Out-Null
-          }
-          $env:TEMP = $customTempDir
-          $env:TMP = $customTempDir
-          
-          Write-Host "Using custom temp directory: $customTempDir" -ForegroundColor Cyan
           Write-Host "Using Web Deploy package deployment with parameter replacement..." -ForegroundColor Cyan
-
           try {
-            Write-Host "Attempting Web Deploy package deployment with parameter replacement..." -ForegroundColor Yellow
+            Write-Host "Deploying Web Deploy package with parameter replacement..." -ForegroundColor Yellow
             
             # Convert paths to absolute for Web Deploy
             $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
@@ -1053,24 +1038,25 @@ jobs:
             Write-Host "Absolute package path: $absolutePackagePath" -ForegroundColor Gray
             Write-Host "Absolute setParam path: $absoluteSetParamPath" -ForegroundColor Gray
             
-            # Build Web Deploy command for local IIS deployment (Microsoft documentation approach)
-            Write-Host "Executing Web Deploy command with parameter replacement:" -ForegroundColor Cyan
-            Write-Host "Package: $absolutePackagePath" -ForegroundColor Gray
-            Write-Host "SetParam File: $absoluteSetParamPath" -ForegroundColor Gray
-            Write-Host "Target: $targetPath" -ForegroundColor Gray
+            # Build Web Deploy command arguments for local IIS deployment
+            $msdeployArgs = @(
+              "-source:package=`"$absolutePackagePath`"",
+              "-dest:contentPath=`"$targetPath`",computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
+              "-verb:sync",
+              "-disableLink:AppPoolExtension",
+              "-disableLink:ContentExtension", 
+              "-disableLink:CertificateExtension",
+              "-setParamFile:`"$absoluteSetParamPath`"",
+              "-allowUntrusted",
+              "-skip:Directory=`"\\App_Data`"",
+              "-verbose"
+            )
             
-            # Execute Web Deploy with proper parameter replacement and custom temp directory
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:package="$absolutePackagePath" `
-              -dest:auto,computerName="localhost",authtype="NTLM",includeAcls="False",tempAgent="false" `
-              -setParamFile:"$absoluteSetParamPath" `
-              -disableLink:AppPoolExtension `
-              -disableLink:ContentExtension `
-              -disableLink:CertificateExtension `
-              -allowUntrusted `
-              -skip:Directory="\\App_Data" `
-              -verbose
+            Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
+            Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
+            
+            # Execute Web Deploy
+            & $msdeployPath @msdeployArgs
             
             if ($LASTEXITCODE -eq 0) {
               Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
@@ -1094,12 +1080,10 @@ jobs:
             }
             
           } catch {
-            
-          }
-          
-          # Clean up custom temp directory
-          if (Test-Path $customTempDir) {
-            Remove-Item -Path $customTempDir -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Error "Deployment failed: $($_.Exception.Message)"
+            Write-Host "Deployment error details:" -ForegroundColor Red
+            Write-Host $_.Exception.ToString() -ForegroundColor Red
+            throw "Web Deploy package deployment failed"
           }
           
           if (-not $deploymentSuccess) {
@@ -1107,4 +1091,3 @@ jobs:
           }
           
           Write-Host "[COMPLETED] Application deployment finished successfully" -ForegroundColor Green
-          
