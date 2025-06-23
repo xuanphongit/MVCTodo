@@ -5,5 +5,8 @@
   <setParameter name="IIS Web Application Name" value="TodoMVCApp" />
   <setParameter name="ASPNETCORE-ENVIRONMENT" value="Production" />
   <setParameter name="Logging-LogLevel-Default" value="Information" />
+  <setParameter name="Application-Domain" value="phongmx.org" />
+  <setParameter name="Application-UseSSL" value="true" />
+  <setParameter name="HTTPS-Binding-Domain" value="phongmx.org" />
   <setParameter name="DefaultConnection" value="" />
 </parameters> 

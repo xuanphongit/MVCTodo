@@ -230,6 +230,26 @@ jobs:
         if ($LASTEXITCODE -ne 0) {
           throw "Publish failed with exit code: $LASTEXITCODE"
         }
+        
+        # Ensure the original appsettings.json with placeholders is used
+        Write-Host "Copying original appsettings.json with placeholders..." -ForegroundColor Yellow
+        $originalAppSettings = "appsettings.json"
+        $publishedAppSettings = Join-Path ${{ env.PUBLISH_PATH }} "appsettings.json"
+        
+        if (Test-Path $originalAppSettings) {
+          Copy-Item $originalAppSettings $publishedAppSettings -Force
+          Write-Host "[SUCCESS] Copied original appsettings.json with placeholders" -ForegroundColor Green
+        } else {
+          Write-Warning "Original appsettings.json not found"
+        }
+        
+        # Copy setParameters files to publish directory for reference
+        $parametersDir = "parameters"
+        if (Test-Path $parametersDir) {
+          $publishParametersDir = Join-Path ${{ env.PUBLISH_PATH }} "parameters"
+          Copy-Item $parametersDir $publishParametersDir -Recurse -Force
+          Write-Host "[SUCCESS] Copied parameters directory" -ForegroundColor Green
+        }
           
         # Verify publish output
         if (Test-Path ${{ env.PUBLISH_PATH }}) {
@@ -933,14 +953,26 @@ jobs:
         $packagePath = Join-Path $packageDir "TodoApp.zip"
         $method = "${{ inputs.web_deploy_method || 'auto' }}"
         $environment = "${{ inputs.environment || 'production' }}"
-        $setParamFile = "parameters/setParameters.$environment.xml"
         
-        # Check if environment-specific parameter file exists, fallback to default
-        if (!(Test-Path $setParamFile)) {
-          $setParamFile = "parameters/setParameters.xml"
-          Write-Warning "Environment-specific parameter file not found, using default: $setParamFile"
-        } else {
-          Write-Host "Using environment-specific parameter file: $setParamFile"
+        # Try to find setParameters file in multiple locations
+        $setParamFile = $null
+        $possiblePaths = @(
+          "parameters/setParameters.$environment.xml",
+          "parameters/setParameters.xml",
+          "$sourcePath/parameters/setParameters.$environment.xml",
+          "$sourcePath/parameters/setParameters.xml"
+        )
+        
+        foreach ($path in $possiblePaths) {
+          if (Test-Path $path) {
+            $setParamFile = $path
+            Write-Host "Found parameter file: $setParamFile" -ForegroundColor Green
+            break
+          }
+        }
+        
+        if (-not $setParamFile) {
+          Write-Warning "No setParameters file found. Parameter replacement will be skipped."
         }
         
         # Debug deployment configuration
@@ -990,44 +1022,88 @@ jobs:
           }
         }
         
-        # Method 2: Direct folder sync (more reliable)
+        # Method 2: Manual parameter replacement + folder sync
         if (!$deploymentSuccess) {
-          Write-Host "Attempting direct folder synchronization..."
+          Write-Host "Attempting folder synchronization with manual parameter replacement..."
           
           # Take application offline
           "App is being updated." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
           Start-Sleep -Seconds 2
           
-          # Sync files using Web Deploy
+          # Copy files first
           $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
+          Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
           
-          & "$msdeployPath" `
-            -verb:sync `
-            -source:contentPath="$absoluteSourcePath" `
-            -dest:contentPath="$targetPath",computerName=localhost `
-            -enableRule:DoNotDeleteRule `
-            -skip:Directory="\\logs$" `
-            -skip:Directory="\\App_Data$" `
-            -skip:File="\\app_offline\.htm$" `
-            -allowUntrusted:true `
-            -verbose
+          # Manual parameter replacement since Web Deploy package isn't working
+          Write-Host "Applying parameter replacement to appsettings.json..." -ForegroundColor Yellow
+          $appsettingsPath = Join-Path $targetPath "appsettings.json"
+          if (Test-Path $appsettingsPath) {
+            $appsettingsContent = Get-Content $appsettingsPath -Raw
             
+            # Load parameter values from setParameters file
+            if ($setParamFile -and (Test-Path $setParamFile)) {
+              [xml]$setParams = Get-Content $setParamFile
+              foreach ($param in $setParams.parameters.setParameter) {
+                $paramName = $param.name
+                $paramValue = $param.value
+                
+                # Map parameter names to placeholders
+                $placeholder = switch ($paramName) {
+                  "Authentication-DefaultCredentials-Username" { "{{USERNAME_PLACEHOLDER}}" }
+                  "Authentication-DefaultCredentials-Password" { "{{PASSWORD_PLACEHOLDER}}" }
+                  "Logging-LogLevel-Default" { "{{LOGLEVEL_PLACEHOLDER}}" }
+                  "Application-Domain" { "{{DOMAIN_PLACEHOLDER}}" }
+                  "Application-UseSSL" { "{{SSL_PLACEHOLDER}}" }
+                  "DefaultConnection" { "{{CONNECTION_PLACEHOLDER}}" }
+                  default { $null }
+                }
+                
+                if ($placeholder) {
+                  $appsettingsContent = $appsettingsContent -replace [regex]::Escape($placeholder), $paramValue
+                  Write-Host "Replaced $placeholder with $paramValue"
+                }
+              }
+              
+              # Save updated appsettings.json
+              $appsettingsContent | Out-File -FilePath $appsettingsPath -Encoding UTF8 -Force
+              Write-Host "[SUCCESS] Parameter replacement completed" -ForegroundColor Green
+            } else {
+              Write-Warning "setParameters file not found, skipping parameter replacement"
+            }
+          } else {
+            Write-Warning "appsettings.json not found in target directory"
+          }
+          
           # Remove app_offline.htm
           if (Test-Path "$targetPath\app_offline.htm") {
             Remove-Item "$targetPath\app_offline.htm" -Force
           }
           
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] Folder synchronization completed successfully"
-            $deploymentSuccess = $true
-          } else {
-            Write-Warning "[WARNING] Folder sync failed with exit code: $LASTEXITCODE"
-            Write-Host "Folder sync details:" -ForegroundColor Yellow
-            Write-Host "- Source path: $absoluteSourcePath"
-            Write-Host "- Target path: $targetPath"
-            Write-Host "- MSDeploy path: $msdeployPath"
-            Write-Warning "Attempting file copy as final fallback."
+          # Verify parameter replacement worked
+          $appsettingsPath = Join-Path $targetPath "appsettings.json"
+          if (Test-Path $appsettingsPath) {
+            Write-Host "=== VERIFYING PARAMETER REPLACEMENT ===" -ForegroundColor Cyan
+            $content = Get-Content $appsettingsPath -Raw
+            
+            # Check if any placeholders remain
+            $remainingPlaceholders = @()
+            @("{{USERNAME_PLACEHOLDER}}", "{{PASSWORD_PLACEHOLDER}}", "{{LOGLEVEL_PLACEHOLDER}}", "{{DOMAIN_PLACEHOLDER}}", "{{SSL_PLACEHOLDER}}", "{{CONNECTION_PLACEHOLDER}}") | ForEach-Object {
+              if ($content -match [regex]::Escape($_)) {
+                $remainingPlaceholders += $_
+              }
+            }
+            
+            if ($remainingPlaceholders.Count -gt 0) {
+              Write-Warning "The following placeholders were not replaced: $($remainingPlaceholders -join ', ')"
+              Write-Host "Current appsettings.json content:" -ForegroundColor Yellow
+              Write-Host $content
+            } else {
+              Write-Host "[SUCCESS] All placeholders have been replaced successfully" -ForegroundColor Green
+            }
           }
+          
+          Write-Host "[SUCCESS] Folder synchronization with parameter replacement completed"
+          $deploymentSuccess = $true
         }
         
         # Method 3: Fallback to simple file copy
