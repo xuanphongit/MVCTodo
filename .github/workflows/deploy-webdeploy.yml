@@ -821,7 +821,7 @@ jobs:
                 Write-Host "[SUCCESS] SSL certificate assigned using hostname binding" -ForegroundColor Green
               }
               
-              Write-Host "[SUCCESS] Successfully configured SSL binding for `$hostname on port 443 using WebAdministration." -ForegroundColor Green`n            }
+              Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using appcmd." -ForegroundColor Green
               
             } else {
               # Use WebAdministration module
@@ -941,8 +941,8 @@ jobs:
                 }
               }
               
-              Write-Host "[SUCCESS] Successfully configured SSL binding for `$hostname on port 443 using WebAdministration." -ForegroundColor Green`n            }
-
+              Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using WebAdministration." -ForegroundColor Green
+            }
             
           } catch {
             Write-Error "Failed to configure SSL certificate: $($_.Exception.Message)"
