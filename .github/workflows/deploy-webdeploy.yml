@@ -319,7 +319,7 @@ jobs:
       run: |
         Write-Host "=== IMPORTING SSL CERTIFICATE ===" -ForegroundColor Yellow
         
-        $pfxPath = ".\.github\workflows\key\origin.pfx"
+        $pfxPath = ".\.github\workflows\key\origin2.pfx"
         $pfxPassword = $env:PFX_PASSWORD
         $hostname = "phongmx.org"
         
