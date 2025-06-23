@@ -833,7 +833,8 @@ jobs:
           } else {
             Write-Warning "No suitable certificate found in certificate store. Skipping SSL configuration."
             Write-Host "To fix this: Run .\fix-ssl-certificate.ps1 as Administrator after deployment" -ForegroundColor Yellow
-            exit 0
+            Write-Host "[SKIPPED] SSL configuration skipped - no certificate available" -ForegroundColor Yellow
+            # Continue without SSL - don't exit or return
           }
         }
         
@@ -854,7 +855,7 @@ jobs:
         
         if ($sslAlreadyConfigured) {
           Write-Host "[SKIPPED] SSL configuration not needed - certificate already bound correctly" -ForegroundColor Green
-        } else {
+        } elseif ($cert -and $thumbprint) {
           Write-Host "[INFO] SSL configuration required. Proceeding with certificate binding..." -ForegroundColor Yellow
         
         try {
@@ -1071,7 +1072,13 @@ jobs:
           # Don't throw here to allow deployment to continue without SSL
         }
         
-        } # End SSL configuration if block
+        } else {
+          Write-Host "[SKIPPED] SSL configuration skipped - no valid certificate available" -ForegroundColor Yellow
+        }
+        
+        # Reset any error codes from SSL operations to prevent deployment failure
+        $global:LASTEXITCODE = 0
+        Write-Host "[COMPLETED] SSL configuration step finished" -ForegroundColor Green
 
     # ================================
     # APPLICATION DEPLOYMENT
@@ -1283,6 +1290,7 @@ jobs:
           # Reset any previous error conditions since deployment ultimately succeeded
           $global:LASTEXITCODE = 0
           $Error.Clear()
+          exit 0
           
         } else {
           Write-Error "All deployment methods failed."
