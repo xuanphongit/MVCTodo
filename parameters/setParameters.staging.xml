@@ -2,7 +2,7 @@
 <parameters>
   <setParameter name="Authentication-DefaultCredentials-Username" value="staging" />
   <setParameter name="Authentication-DefaultCredentials-Password" value="Staging@2024" />
-  <setParameter name="IIS Web Application Name" value="Default Web Site/TodoApp-Staging" />
+  <setParameter name="IIS Web Application Name" value="TodoMVCApp-Staging" />
   <setParameter name="ASPNETCORE-ENVIRONMENT" value="Staging" />
   <setParameter name="Logging-LogLevel-Default" value="Warning" />
   <setParameter name="Application-Domain" value="staging.phongmx.org" />
