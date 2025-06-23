@@ -22,6 +22,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup>
+    <Content Update="web.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <!-- 
   Security Note: Microsoft.VisualStudio.Web.CodeGeneration.Design was removed due to CVE-2025-48734
