@@ -36,9 +36,12 @@
   * Manual code generation
   -->
   
-  <ItemGroup>
-    <!-- Core runtime dependencies only, no development/scaffolding packages -->
+  <ItemGroup><!-- Core runtime dependencies only, no development/scaffolding packages -->
     <!-- Add production packages here as needed -->
+  
+    <None Update="Parameters.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
