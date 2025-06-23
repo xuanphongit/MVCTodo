@@ -1040,10 +1040,11 @@ jobs:
           $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
           $absoluteSetParamPath = Resolve-Path $setParamFile | Select-Object -ExpandProperty Path
           
-          # Build Web Deploy command arguments
+          # Build Web Deploy command arguments for local IIS deployment
+          # Try IIS app deployment first, then fallback to contentPath if needed
           $msdeployArgs = @(
             "-source:package=`"$absolutePackagePath`"",
-            "-dest:auto,computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
+            "-dest:contentPath=`"$targetPath`",computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
             "-verb:sync",
             "-disableLink:AppPoolExtension",
             "-disableLink:ContentExtension", 
@@ -1057,12 +1058,40 @@ jobs:
           Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
           Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
           
+          # Verify target directory exists and is accessible
+          Write-Host "Verifying target directory: $targetPath" -ForegroundColor Yellow
+          if (!(Test-Path $targetPath)) {
+            Write-Host "Creating target directory: $targetPath" -ForegroundColor Yellow
+            New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+            icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T /Q | Out-Null
+          }
+          
           # Execute Web Deploy
           & $msdeployPath @msdeployArgs
           
           if ($LASTEXITCODE -eq 0) {
             Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
-            $deploymentSuccess = $true
+            
+            # Verify files were actually deployed to target directory
+            Write-Host "Verifying deployment to target directory: $targetPath" -ForegroundColor Yellow
+            $deployedFiles = Get-ChildItem -Path $targetPath -Recurse -File -ErrorAction SilentlyContinue
+            if ($deployedFiles -and $deployedFiles.Count -gt 0) {
+              Write-Host "Found $($deployedFiles.Count) files in target directory" -ForegroundColor Green
+              Write-Host "Key files:" -ForegroundColor Cyan
+              @("Todo.dll", "Todo.exe", "appsettings.json", "web.config") | ForEach-Object {
+                $file = Join-Path $targetPath $_
+                if (Test-Path $file) {
+                  $fileInfo = Get-Item $file
+                  Write-Host "  ✓ $_ ($(Get-Date $fileInfo.LastWriteTime -Format 'yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Green
+                } else {
+                  Write-Host "  ✗ $_ (missing)" -ForegroundColor Red
+                }
+              }
+              $deploymentSuccess = $true
+            } else {
+              Write-Warning "No files found in target directory after deployment!"
+              throw "Deployment verification failed - target directory is empty"
+            }
           } else {
             Write-Error "Web Deploy failed with exit code: $LASTEXITCODE"
             throw "Web Deploy package deployment failed"
