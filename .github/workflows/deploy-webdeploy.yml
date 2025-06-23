@@ -972,26 +972,7 @@ jobs:
           $environment = "production"
 
           # Try to find setParameters file in multiple locations
-          $setParamFile = $null
-          $possiblePaths = @(
-            "parameters/setParameters.production.xml",
-            "parameters/setParameters.xml",
-            "$sourcePath/parameters/setParameters.production.xml",
-            "$sourcePath/parameters/setParameters.xml"
-          )
-
-          foreach ($path in $possiblePaths) {
-            if (Test-Path $path) {
-              $setParamFile = $path
-              Write-Host "Found parameter file: $setParamFile" -ForegroundColor Green
-              break
-            }
-          }
-
-          if (-not $setParamFile) {
-            Write-Warning "No setParameters file found. Parameter replacement will be skipped."
-          }
-
+          $setParamFile = "parameters/setParameters.xml"
           # Debug deployment configuration
           Write-Host "Deployment configuration:" -ForegroundColor Cyan
           Write-Host "- Method: $method"
@@ -1023,41 +1004,3 @@ jobs:
           if (!$setParamFile -or !(Test-Path $setParamFile)) {
             throw "setParameters file not found. Required for Web Deploy package deployment."
           }
-
-          Write-Host "Package: $packagePath" -ForegroundColor Green
-          Write-Host "Parameters: $setParamFile" -ForegroundColor Green
-
-          try {
-            Write-Host "Deploying Web Deploy package with parameter replacement..." -ForegroundColor Yellow
-            
-            # Convert paths to absolute for Web Deploy
-            $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
-            $absoluteSetParamPath = Resolve-Path $setParamFile | Select-Object -ExpandProperty Path
-            
-            # Build Web Deploy command arguments for local IIS deployment
-            $msdeployArgs = @(
-              "-source:package=`"$absolutePackagePath`"",
-              "-dest:contentPath=`"$targetPath`",computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
-              "-verb:sync",
-              "-disableLink:AppPoolExtension",
-              "-disableLink:ContentExtension", 
-              "-disableLink:CertificateExtension",
-              "-setParamFile:`"$absoluteSetParamPath`"",
-              "-allowUntrusted",
-              "-skip:Directory=`"\\App_Data`"",
-              "-verbose"
-            )
-            
-            Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
-            Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
-            
-            # Verify target directory exists and is accessible
-            Write-Host "Verifying target directory: $targetPath" -ForegroundColor Yellow
-            if (!(Test-Path $targetPath)) {
-              Write-Host "Creating target directory: $targetPath" -ForegroundColor Yellow
-              New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
-              icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T /Q | Out-Null
-            }
-            
-            # Execute Web Deploy
-            & $msdeployPath @msdeployArgs
