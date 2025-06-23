@@ -524,10 +524,10 @@ jobs:
               & $appcmdPath stop site $siteName
               Start-Sleep -Seconds 3
               
-              # Update website configuration
-              Write-Host "Updating website configuration using appcmd..."
-              & $appcmdPath set site $siteName /physicalPath:$sitePath
-              & $appcmdPath set site $siteName /applicationDefaults.applicationPool:$appPoolName
+                          # Update website configuration
+            Write-Host "Updating website configuration using appcmd..."
+            & $appcmdPath set site $siteName /[path='/'].physicalPath:$sitePath
+            & $appcmdPath set site $siteName /applicationDefaults.applicationPool:$appPoolName
             } else {
               Write-Host "Creating new Website: $siteName using appcmd..."
               & $appcmdPath add site /name:$siteName /physicalPath:$sitePath /bindings:http/*:80:
@@ -542,11 +542,11 @@ jobs:
             if ($environment -eq "production") {
               # Production: Add domain-specific HTTP binding
               Write-Host "Adding production HTTP binding for phongmx.org..."
-              & $appcmdPath set site $siteName /+bindings.[protocol='http',bindingInformation='*:80:phongmx.org']
+              & $appcmdPath set site $siteName "/+bindings.[protocol='http',bindingInformation='*:80:phongmx.org']"
             } elseif ($environment -eq "staging") {
               # Staging: Add staging subdomain binding
               Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
-              & $appcmdPath set site $siteName /+bindings.[protocol='http',bindingInformation='*:80:staging.phongmx.org']
+              & $appcmdPath set site $siteName "/+bindings.[protocol='http',bindingInformation='*:80:staging.phongmx.org']"
             }
             
             # Start the website
@@ -799,7 +799,7 @@ jobs:
             
             # Create new HTTPS binding
             Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName' using appcmd..."
-            & $appcmdPath set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:443:$hostname"]
+            & $appcmdPath set site "$siteName" "/+bindings.[protocol='https',bindingInformation='*:443:$hostname']"
             
             # Assign certificate using netsh (since appcmd doesn't handle SSL cert assignment directly)
             Write-Host "Assigning SSL certificate using netsh..."
@@ -870,7 +870,7 @@ jobs:
               } catch {
                 Write-Warning "New-WebBinding failed, using appcmd as fallback: $($_.Exception.Message)"
                 $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-                & $appcmdPath set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:443:$hostname"]
+                & $appcmdPath set site "$siteName" "/+bindings.[protocol='https',bindingInformation='*:443:$hostname']"
               }
             }
             
