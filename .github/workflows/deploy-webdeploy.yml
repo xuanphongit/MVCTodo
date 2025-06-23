@@ -244,6 +244,12 @@ jobs:
           throw "Publish directory not found after publish operation"
         }
 
+    - name: Upload published artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: published-app
+        path: ${{ env.PUBLISH_PATH }}
+
     - name: Create Web Deploy package
       shell: powershell
       run: |
