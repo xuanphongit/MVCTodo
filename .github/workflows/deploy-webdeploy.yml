@@ -898,13 +898,49 @@ jobs:
               # Ignore if binding doesn't exist
             }
             
-            # Also remove any existing SSL certificate binding
-            Write-Host "Removing existing SSL certificate binding if it exists..."
+            # Check and remove existing SSL certificate bindings only if they exist
+            Write-Host "Checking for existing SSL certificate bindings..."
+            
+            # Check hostname-based binding
+            $hostnameBindingExists = $false
             try {
-              netsh http delete sslcert hostnameport="$hostname`:443" 2>$null
-              netsh http delete sslcert ipport="0.0.0.0:443" 2>$null
+              $result = netsh http show sslcert hostnameport="$hostname`:443" 2>$null
+              $hostnameBindingExists = $LASTEXITCODE -eq 0
             } catch {
-              # Ignore if certificate binding doesn't exist
+              $hostnameBindingExists = $false
+            }
+            
+            if ($hostnameBindingExists) {
+              Write-Host "Removing existing hostname SSL binding for $hostname`:443..."
+              netsh http delete sslcert hostnameport="$hostname`:443" | Out-Null
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Removed hostname SSL binding" -ForegroundColor Green
+              } else {
+                Write-Warning "Failed to remove hostname SSL binding"
+              }
+            } else {
+              Write-Host "[INFO] No hostname SSL binding found for $hostname`:443" -ForegroundColor Cyan
+            }
+            
+            # Check IP-based binding
+            $ipBindingExists = $false
+            try {
+              $result = netsh http show sslcert ipport="0.0.0.0:443" 2>$null
+              $ipBindingExists = $LASTEXITCODE -eq 0
+            } catch {
+              $ipBindingExists = $false
+            }
+            
+            if ($ipBindingExists) {
+              Write-Host "Removing existing IP SSL binding for 0.0.0.0:443..."
+              netsh http delete sslcert ipport="0.0.0.0:443" | Out-Null
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Removed IP SSL binding" -ForegroundColor Green
+              } else {
+                Write-Warning "Failed to remove IP SSL binding"
+              }
+            } else {
+              Write-Host "[INFO] No IP SSL binding found for 0.0.0.0:443" -ForegroundColor Cyan
             }
             
             # Create new HTTPS binding
@@ -958,13 +994,49 @@ jobs:
               }
             }
             
-            # Also remove any existing SSL certificate binding
-            Write-Host "Removing existing SSL certificate binding if it exists..."
+            # Check and remove existing SSL certificate bindings only if they exist
+            Write-Host "Checking for existing SSL certificate bindings..."
+            
+            # Check hostname-based binding
+            $hostnameBindingExists = $false
             try {
-              netsh http delete sslcert hostnameport="$hostname`:443" 2>$null
-              netsh http delete sslcert ipport="0.0.0.0:443" 2>$null
+              $result = netsh http show sslcert hostnameport="$hostname`:443" 2>$null
+              $hostnameBindingExists = $LASTEXITCODE -eq 0
             } catch {
-              # Ignore if certificate binding doesn't exist
+              $hostnameBindingExists = $false
+            }
+            
+            if ($hostnameBindingExists) {
+              Write-Host "Removing existing hostname SSL binding for $hostname`:443..."
+              netsh http delete sslcert hostnameport="$hostname`:443" | Out-Null
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Removed hostname SSL binding" -ForegroundColor Green
+              } else {
+                Write-Warning "Failed to remove hostname SSL binding"
+              }
+            } else {
+              Write-Host "[INFO] No hostname SSL binding found for $hostname`:443" -ForegroundColor Cyan
+            }
+            
+            # Check IP-based binding
+            $ipBindingExists = $false
+            try {
+              $result = netsh http show sslcert ipport="0.0.0.0:443" 2>$null
+              $ipBindingExists = $LASTEXITCODE -eq 0
+            } catch {
+              $ipBindingExists = $false
+            }
+            
+            if ($ipBindingExists) {
+              Write-Host "Removing existing IP SSL binding for 0.0.0.0:443..."
+              netsh http delete sslcert ipport="0.0.0.0:443" | Out-Null
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] Removed IP SSL binding" -ForegroundColor Green
+              } else {
+                Write-Warning "Failed to remove IP SSL binding"
+              }
+            } else {
+              Write-Host "[INFO] No IP SSL binding found for 0.0.0.0:443" -ForegroundColor Cyan
             }
             
             # Create new binding with proper parameter handling
