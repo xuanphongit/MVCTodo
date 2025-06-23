@@ -8,5 +8,4 @@
   <setParameter name="Application-Domain" value="phongmx.org" />
   <setParameter name="Application-UseSSL" value="true" />
   <setParameter name="HTTPS-Binding-Domain" value="phongmx.org" />
-  <setParameter name="DefaultConnection" value="" />
 </parameters> 
