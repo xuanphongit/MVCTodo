@@ -31,38 +31,44 @@ netsh http show sslcert | findstr "443"
 
 ## ✅ **Solutions Implemented**
 
-### 1. **Enhanced Deployment Workflow** 
+### 1. **Restructured Deployment Workflow** 
 **File**: `.github/workflows/deploy-webdeploy.yml`
 
+**Major Restructuring**:
+- **Correct Order**: SSL Certificate import → IIS Site setup → SSL binding (proper sequence!)
+- **Two-Step Process**: Separated certificate import from IIS binding for better control
+- **Environment Variables**: Store imported certificate thumbprint for later use
+- **Enhanced Logging**: Detailed certificate information and availability listing
+
 **Changes Made**:
-- **Fallback Certificate Discovery**: When `origin.pfx` is missing, workflow now searches for existing certificates
-- **Smart Certificate Selection**: Prioritizes domain-specific certificates, falls back to localhost certificate
-- **Improved Error Handling**: Graceful fallback instead of complete failure
-- **Better Logging**: Clear messages about which certificate is being used
+- **Certificate Import First**: Import `origin.pfx` BEFORE setting up IIS sites
+- **Smart Certificate Selection**: Prioritizes imported certificate, then domain-specific, then localhost
+- **Improved Error Handling**: Graceful fallback with clear messaging
+- **Better Separation**: Import and binding are now separate, focused steps
 
-**Key Improvements**:
+**New Workflow Structure**:
 ```yaml
-# Before: Failed if origin.pfx missing
-if (-not (Test-Path $pfxPath)) {
-  Write-Warning "SSL certificate not found. Skipping SSL configuration."
-  exit 0
-}
+# Step 1: Import SSL Certificate (NEW - happens FIRST)
+- name: Import SSL Certificate
+  run: |
+    # Import origin.pfx and store thumbprint in environment
+    $cert = Import-PfxCertificate -FilePath $pfxPath -Password $passwordSecure
+    echo "SSL_CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+    echo "SSL_CERT_IMPORTED=true" >> $env:GITHUB_ENV
 
-# After: Smart fallback to existing certificates
-if (-not (Test-Path $pfxPath)) {
-  Write-Warning "SSL certificate file not found."
-  Write-Host "Attempting to use existing certificate from certificate store..."
-  
-  $existingCert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { 
-    $_.Subject -like "*$hostname*" -or $_.Subject -like "*localhost*" 
-  } | Select-Object -First 1
-  
-  if ($existingCert) {
-    $cert = $existingCert
-    $thumbprint = $cert.Thumbprint
-    # Continue with SSL configuration
-  }
-}
+# Step 2: Setup IIS Application Pool and Website
+- name: Setup IIS Application Pool and Website
+  run: |
+    # Create IIS site (certificate already available)
+    
+# Step 3: Bind SSL Certificate to IIS (UPDATED)  
+- name: Configure SSL Certificate
+  run: |
+    # Use imported certificate from environment variable
+    if ($env:SSL_CERT_THUMBPRINT -and $env:SSL_CERT_IMPORTED -eq "true") {
+      $thumbprint = $env:SSL_CERT_THUMBPRINT
+      # Bind to IIS site
+    }
 ```
 
 ### 2. **SSL Certificate Fix Script**
@@ -196,11 +202,13 @@ curl -k https://phongmx.org
 
 After applying these fixes:
 
-1. ✅ **HTTPS Binding Created**: `phongmx.org:443` properly bound in IIS
-2. ✅ **SSL Certificate Assigned**: Certificate bound to port 443
-3. ✅ **Firewall Configured**: Port 443 open for HTTPS traffic
-4. ✅ **Deployment Succeeds**: No longer fails due to missing SSL certificate
-5. ✅ **HTTPS Access Works**: `https://phongmx.org` loads (with certificate warning)
+1. ✅ **Certificate Import Success**: `origin.pfx` imported before IIS setup
+2. ✅ **HTTPS Binding Created**: `phongmx.org:443` properly bound in IIS
+3. ✅ **SSL Certificate Assigned**: Imported certificate bound to port 443
+4. ✅ **Firewall Configured**: Port 443 open for HTTPS traffic
+5. ✅ **Deployment Succeeds**: Reliable SSL configuration with proper ordering
+6. ✅ **HTTPS Access Works**: `https://phongmx.org` loads with domain-specific certificate
+7. ✅ **No Browser Warnings**: If using valid certificate from origin.pfx
 
 ## 🔒 **Security Considerations**
 
