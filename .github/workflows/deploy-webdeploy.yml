@@ -1094,78 +1094,7 @@ jobs:
             }
             
           } catch {
-            Write-Warning "Web Deploy package deployment failed: $($_.Exception.Message)"
-            Write-Host "Attempting fallback deployment with manual parameter replacement..." -ForegroundColor Yellow
             
-            # Fallback: Manual deployment with parameter replacement
-            try {
-              # Stop application pool for safe deployment
-              Write-Host "Stopping application pool: ${{ env.IIS_APP_POOL }}"
-              Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-              Start-Sleep -Seconds 5
-              
-              # Copy files directly from publish directory
-              Write-Host "Copying files from $sourcePath to $targetPath"
-              Copy-Item -Path "$sourcePath\*" -Destination $targetPath -Recurse -Force
-              
-              # Manual parameter replacement in deployed files
-              Write-Host "Performing manual parameter replacement..." -ForegroundColor Cyan
-              
-              # Load parameter values from setParameters file
-              [xml]$paramContent = Get-Content $setParamFile
-              $paramValues = @{}
-              foreach ($param in $paramContent.parameters.setParameter) {
-                $paramValues[$param.name] = $param.value
-              }
-              
-              # Replace parameters in web.config if it exists
-              $deployedWebConfig = Join-Path $targetPath "web.config"
-              if (Test-Path $deployedWebConfig) {
-                Write-Host "Updating web.config with parameter values..."
-                $webConfigContent = Get-Content $deployedWebConfig -Raw
-                
-                # Apply parameter replacements based on the parameter definitions
-                if ($paramValues.ContainsKey("Authentication-DefaultCredentials-Username")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*key="Authentication:DefaultCredentials:Username")', "value=`"$($paramValues['Authentication-DefaultCredentials-Username'])`"`$1"
-                }
-                if ($paramValues.ContainsKey("Authentication-DefaultCredentials-Password")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*key="Authentication:DefaultCredentials:Password")', "value=`"$($paramValues['Authentication-DefaultCredentials-Password'])`"`$1"
-                }
-                if ($paramValues.ContainsKey("ASPNETCORE-ENVIRONMENT")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*name="ASPNETCORE_ENVIRONMENT")', "value=`"$($paramValues['ASPNETCORE-ENVIRONMENT'])`"`$1"
-                }
-                if ($paramValues.ContainsKey("Logging-LogLevel-Default")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*key="Logging:LogLevel:Default")', "value=`"$($paramValues['Logging-LogLevel-Default'])`"`$1"
-                }
-                if ($paramValues.ContainsKey("Application-Domain")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*key="Application:Domain")', "value=`"$($paramValues['Application-Domain'])`"`$1"
-                }
-                if ($paramValues.ContainsKey("Application-UseSSL")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*key="Application:UseSSL")', "value=`"$($paramValues['Application-UseSSL'])`"`$1"
-                }
-                if ($paramValues.ContainsKey("HTTPS-Binding-Domain")) {
-                  $webConfigContent = $webConfigContent -replace 'value="[^"]*"([^>]*key="HTTPS:Binding:Domain")', "value=`"$($paramValues['HTTPS-Binding-Domain'])`"`$1"
-                }
-                
-                $webConfigContent | Out-File $deployedWebConfig -Encoding UTF8 -Force
-                Write-Host "[SUCCESS] web.config updated with parameter values" -ForegroundColor Green
-              }
-              
-              # Set proper permissions
-              icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)R" /T /Q | Out-Null
-              icacls $targetPath /grant "IUSR:(OI)(CI)R" /T /Q | Out-Null
-              
-              # Start application pool
-              Write-Host "Starting application pool: ${{ env.IIS_APP_POOL }}"
-              Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
-              
-              $deploymentSuccess = $true
-              Write-Host "[SUCCESS] Fallback deployment completed successfully" -ForegroundColor Green
-              
-            } catch {
-              Write-Error "Fallback deployment also failed: $($_.Exception.Message)"
-              throw "Both Web Deploy and fallback deployment failed"
-            }
           }
           
           # Clean up custom temp directory
