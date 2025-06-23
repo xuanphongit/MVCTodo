@@ -31,8 +31,4 @@
   <parameter name="HTTPS-Binding-Domain" defaultValue="phongmx.org">
     <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='HTTPS:Binding:Domain']/@value" />
   </parameter>
-
-  <parameter name="DefaultConnection" defaultValue="">
-    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/connectionStrings/add[@name='DefaultConnection']/@connectionString" />
-  </parameter>
 </parameters>
