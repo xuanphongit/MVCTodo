@@ -329,51 +329,78 @@ jobs:
 
         # Import required modules for IIS management
         Write-Host "Importing IIS management modules..."
+        $webAdminAvailable = $false
+        $useAppcmd = $false
+        
+        # First, check if appcmd.exe is available as primary fallback
+        $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+        if (Test-Path $appcmdPath) {
+          Write-Host "[INFO] appcmd.exe found at: $appcmdPath" -ForegroundColor Cyan
+          $useAppcmd = $true
+        }
+        
         try {
           # Try importing WebAdministration module
-          Import-Module WebAdministration -ErrorAction Stop
-          Write-Host "[SUCCESS] WebAdministration module imported" -ForegroundColor Green
-        } catch {
-          Write-Warning "WebAdministration module not available. Installing IIS Management Tools..."
+          Import-Module WebAdministration -Force -ErrorAction Stop
           
-          # Install IIS Management Tools if not available
-          try {
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-CommonHttpFeatures -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpErrors -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpLogging -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpRedirect -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ApplicationDevelopment -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-NetFx45 -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-NetFxExtensibility45 -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ISAPIExtensions -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ISAPIFilter -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ASPNET45 -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-IIS6ManagementCompatibility -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-Metabase -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WMICompatibility -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-LegacyScripts -All -NoRestart
-            Enable-WindowsOptionalFeature -Online -FeatureName IIS-LegacySnapIn -All -NoRestart
+          # Test if cmdlets are actually available
+          $testCmdlet = Get-Command "Get-WebAppPool" -ErrorAction SilentlyContinue
+          if ($testCmdlet) {
+            Write-Host "[SUCCESS] WebAdministration module imported and cmdlets available" -ForegroundColor Green
+            $webAdminAvailable = $true
+          } else {
+            Write-Warning "WebAdministration module imported but cmdlets not available"
+            throw "WebAdministration cmdlets not available"
+          }
+          
+        } catch {
+          Write-Warning "WebAdministration module issue: $($_.Exception.Message)"
+          
+          if ($useAppcmd) {
+            Write-Host "[INFO] Falling back to appcmd.exe for IIS management" -ForegroundColor Yellow
+            $env:USE_APPCMD = "true"
+          } else {
+            Write-Warning "Attempting to install IIS Management Tools..."
             
-            Write-Host "IIS features installed. Attempting to import WebAdministration module again..."
-            Import-Module WebAdministration -ErrorAction Stop
-            Write-Host "[SUCCESS] WebAdministration module imported after installation" -ForegroundColor Green
-            
-          } catch {
-            Write-Error "Failed to install IIS features or import WebAdministration module: $($_.Exception.Message)"
-            Write-Host "Attempting alternative approach using direct IIS commands..."
-            
-            # Alternative: Use appcmd.exe directly
-            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-            if (Test-Path $appcmdPath) {
-              Write-Host "Using appcmd.exe as alternative to WebAdministration module"
-              $env:USE_APPCMD = "true"
-            } else {
+            # Install IIS Management Tools if not available
+            try {
+              Write-Host "Installing IIS Management features..."
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart -ErrorAction SilentlyContinue
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart -ErrorAction SilentlyContinue
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart -ErrorAction SilentlyContinue
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-IIS6ManagementCompatibility -All -NoRestart -ErrorAction SilentlyContinue
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-Metabase -All -NoRestart -ErrorAction SilentlyContinue
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-WMICompatibility -All -NoRestart -ErrorAction SilentlyContinue
+              Enable-WindowsOptionalFeature -Online -FeatureName IIS-LegacyScripts -All -NoRestart -ErrorAction SilentlyContinue
+              
+              Write-Host "Waiting for feature installation to complete..."
+              Start-Sleep -Seconds 5
+              
+              # Re-check for appcmd after installation
+              if (Test-Path $appcmdPath) {
+                Write-Host "[SUCCESS] appcmd.exe now available after IIS installation" -ForegroundColor Green
+                $env:USE_APPCMD = "true"
+                $useAppcmd = $true
+              } else {
+                throw "IIS installation failed - appcmd.exe still not available"
+              }
+              
+            } catch {
+              Write-Error "Failed to install IIS features: $($_.Exception.Message)"
               throw "Neither WebAdministration module nor appcmd.exe is available. IIS management tools are required."
             }
           }
+        }
+        
+        # Set the management method to use
+        if ($webAdminAvailable) {
+          Write-Host "[INFO] Will use WebAdministration PowerShell module" -ForegroundColor Cyan
+          $env:USE_APPCMD = "false"
+        } elseif ($useAppcmd) {
+          Write-Host "[INFO] Will use appcmd.exe for IIS management" -ForegroundColor Cyan
+          $env:USE_APPCMD = "true"
+        } else {
+          throw "No viable IIS management method available"
         }
         
         Write-Host "=== IIS WEB APP MANAGEMENT (Azure DevOps Style) ===" -ForegroundColor Cyan
@@ -727,7 +754,9 @@ jobs:
             
           } else {
             # Use WebAdministration module
-            Import-Module WebAdministration -ErrorAction Stop
+            if ($env:USE_APPCMD -ne "true") {
+              Import-Module WebAdministration -ErrorAction Stop
+            }
             
             # Get existing binding
             $existingBinding = Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" -ErrorAction SilentlyContinue
@@ -861,10 +890,18 @@ jobs:
             & $appcmdPath stop site "$siteName"
             Start-Sleep -Seconds 3
           } else {
-            Import-Module WebAdministration -ErrorAction SilentlyContinue
-            Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-            Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 3
+            try {
+              Import-Module WebAdministration -ErrorAction Stop
+              Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
+              Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 3
+            } catch {
+              Write-Warning "Could not use WebAdministration module, falling back to appcmd for stop operations"
+              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+              & $appcmdPath stop apppool "${{ env.IIS_APP_POOL }}"
+              & $appcmdPath stop site "$siteName"
+              Start-Sleep -Seconds 3
+            }
           }
           
           # Copy files
@@ -877,8 +914,15 @@ jobs:
             & $appcmdPath start apppool "${{ env.IIS_APP_POOL }}"
             & $appcmdPath start site "$siteName"
           } else {
-            Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
-            Start-Website -Name "$siteName"
+            try {
+              Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
+              Start-Website -Name "$siteName"
+            } catch {
+              Write-Warning "Could not use WebAdministration module, falling back to appcmd for start operations"
+              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+              & $appcmdPath start apppool "${{ env.IIS_APP_POOL }}"
+              & $appcmdPath start site "$siteName"
+            }
           }
           
           Write-Host "[SUCCESS] Fallback file copy deployment completed"
