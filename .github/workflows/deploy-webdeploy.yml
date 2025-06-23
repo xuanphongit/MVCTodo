@@ -1071,7 +1071,6 @@ jobs:
             if ($deployedFiles -and $deployedFiles.Count -gt 0) {
               Write-Host "Found $($deployedFiles.Count) files in target directory" -ForegroundColor Green
               Write-Host "Key files:" -ForegroundColor Cyan
-              
               $keyFiles = @("Todo.dll", "Todo.exe", "appsettings.json", "web.config")
               foreach ($fileName in $keyFiles) {
                 $file = Join-Path $targetPath $fileName
@@ -1082,7 +1081,6 @@ jobs:
                   Write-Host "  ✗ $fileName (missing)" -ForegroundColor Red
                 }
               }
-              
               $deploymentSuccess = $true
             } else {
               Write-Warning "No files found in target directory after deployment!"
