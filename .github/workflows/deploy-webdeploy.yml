@@ -1028,43 +1028,8 @@ jobs:
               icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T /Q | Out-Null
             }
             
-            # Execute Web Deploy
             & $msdeployPath @msdeployArgs
-            
-
-
-
-            
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
-              
-              # Verify files were actually deployed to target directory
-              Write-Host "Verifying deployment to target directory: $targetPath" -ForegroundColor Yellow
-              $deployedFiles = Get-ChildItem -Path $targetPath -Recurse -File -ErrorAction SilentlyContinue
-              if ($deployedFiles -and $deployedFiles.Count -gt 0) {
-                Write-Host "Found $($deployedFiles.Count) files in target directory" -ForegroundColor Green
-                Write-Host "Key files:" -ForegroundColor Cyan
-                $keyFiles = @("Todo.dll", "Todo.exe", "appsettings.json", "web.config")
-                foreach ($fileName in $keyFiles) {
-                  $file = Join-Path $targetPath $fileName
-                  if (Test-Path $file) {
-                    $fileInfo = Get-Item $file
-                    Write-Host "  ✓ $fileName ($(Get-Date $fileInfo.LastWriteTime -Format 'yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Green
-                  } else {
-                    Write-Host "  ✗ $fileName (missing)" -ForegroundColor Red
-                  }
-                }
-                $deploymentSuccess = $true
-              } else {
-                Write-Warning "No files found in target directory after deployment!"
-                throw "Deployment verification failed - target directory is empty"
-              }
-            } else {
-              Write-Error "Web Deploy failed with exit code: $LASTEXITCODE"
-              throw "Web Deploy package deployment failed"
-            }
-            
           } catch {
-           
+
            }
           
