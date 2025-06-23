@@ -1,38 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <parameters>
   <parameter name="Authentication-DefaultCredentials-Username" defaultValue="admin">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//appSettings/add[@key='Authentication:DefaultCredentials:Username']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='Authentication:DefaultCredentials:Username']/@value" />
   </parameter>
 
   <parameter name="Authentication-DefaultCredentials-Password" defaultValue="admin123">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//appSettings/add[@key='Authentication:DefaultCredentials:Password']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='Authentication:DefaultCredentials:Password']/@value" />
   </parameter>
 
   <parameter name="IIS Web Application Name" defaultValue="TodoMVCApp">
-    <parameterEntry kind="ProviderPath" />
+    <parameterEntry kind="ProviderPath" scope="iisApp" match="^.*$" />
   </parameter>
 
   <parameter name="ASPNETCORE-ENVIRONMENT" defaultValue="Production">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//environmentVariables/add[@name='ASPNETCORE_ENVIRONMENT']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/system.webServer/aspNetCore/environmentVariables/add[@name='ASPNETCORE_ENVIRONMENT']/@value" />
   </parameter>
 
   <parameter name="Logging-LogLevel-Default" defaultValue="Information">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//appSettings/add[@key='Logging:LogLevel:Default']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='Logging:LogLevel:Default']/@value" />
   </parameter>
 
   <parameter name="Application-Domain" defaultValue="phongmx.org">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//appSettings/add[@key='Application:Domain']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='Application:Domain']/@value" />
   </parameter>
 
   <parameter name="Application-UseSSL" defaultValue="true">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//appSettings/add[@key='Application:UseSSL']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='Application:UseSSL']/@value" />
   </parameter>
 
   <parameter name="HTTPS-Binding-Domain" defaultValue="phongmx.org">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//appSettings/add[@key='HTTPS:Binding:Domain']/@value" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/appSettings/add[@key='HTTPS:Binding:Domain']/@value" />
   </parameter>
 
   <parameter name="DefaultConnection" defaultValue="">
-    <parameterEntry kind="XmlFile" scope="\\web.config$" match="//connectionStrings/add[@name='DefaultConnection']/@connectionString" />
+    <parameterEntry kind="XmlFile" scope="web\.config$" match="/configuration/connectionStrings/add[@name='DefaultConnection']/@connectionString" />
   </parameter>
 </parameters>

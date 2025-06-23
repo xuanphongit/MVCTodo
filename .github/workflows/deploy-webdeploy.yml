@@ -265,15 +265,31 @@ jobs:
           Write-Host "Package directory: $packageDir" -ForegroundColor Gray
           Write-Host "Package path: $absolutePackagePath" -ForegroundColor Gray
           
-          # Create package without parameter validation during creation
-          & "$msdeployPath" `
-            -verb:sync `
-            -source:contentPath="$absoluteSourcePath" `
-            -dest:package="$absolutePackagePath" `
-            -disableLink:AppPoolExtension `
-            -disableLink:ContentExtension `
-            -disableLink:CertificateExtension `
-            -verbose
+          # Create package with parameter definitions (required for parameter replacement)
+          $parameterFile = Join-Path (Get-Location) "parameters.xml"
+          if (Test-Path $parameterFile) {
+            Write-Host "Using parameters file: $parameterFile" -ForegroundColor Cyan
+            $absoluteParameterFile = Resolve-Path $parameterFile | Select-Object -ExpandProperty Path
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:contentPath="$absoluteSourcePath" `
+              -dest:package="$absolutePackagePath" `
+              -declareParamFile:"$absoluteParameterFile" `
+              -disableLink:AppPoolExtension `
+              -disableLink:ContentExtension `
+              -disableLink:CertificateExtension `
+              -verbose
+          } else {
+            Write-Warning "parameters.xml not found at root - creating package without parameter definitions"
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:contentPath="$absoluteSourcePath" `
+              -dest:package="$absolutePackagePath" `
+              -disableLink:AppPoolExtension `
+              -disableLink:ContentExtension `
+              -disableLink:CertificateExtension `
+              -verbose
+          }
             
           if ($LASTEXITCODE -eq 0 -and (Test-Path "$absolutePackagePath")) {
             $packageInfo = Get-Item "$absolutePackagePath"
@@ -1028,25 +1044,24 @@ jobs:
             Write-Host "Absolute package path: $absolutePackagePath" -ForegroundColor Gray
             Write-Host "Absolute setParam path: $absoluteSetParamPath" -ForegroundColor Gray
             
-            # Build Web Deploy command arguments for local IIS deployment
-            $msdeployArgs = @(
-              "-source:package=`"$absolutePackagePath`"",
-              "-dest:contentPath=`"$targetPath`",computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
-              "-verb:sync",
-              "-disableLink:AppPoolExtension",
-              "-disableLink:ContentExtension", 
-              "-disableLink:CertificateExtension",
-              "-setParamFile:`"$absoluteSetParamPath`"",
-              "-allowUntrusted",
-              "-skip:Directory=`"\\App_Data`"",
-              "-verbose"
-            )
+            # Build Web Deploy command for local IIS deployment (Microsoft documentation approach)
+            Write-Host "Executing Web Deploy command with parameter replacement:" -ForegroundColor Cyan
+            Write-Host "Package: $absolutePackagePath" -ForegroundColor Gray
+            Write-Host "SetParam File: $absoluteSetParamPath" -ForegroundColor Gray
+            Write-Host "Target: $targetPath" -ForegroundColor Gray
             
-            Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
-            Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
-            
-            # Execute Web Deploy
-            & $msdeployPath @msdeployArgs
+            # Execute Web Deploy with proper parameter replacement
+            & "$msdeployPath" `
+              -verb:sync `
+              -source:package="$absolutePackagePath" `
+              -dest:auto,computerName="localhost",authtype="NTLM",includeAcls="False" `
+              -setParamFile:"$absoluteSetParamPath" `
+              -disableLink:AppPoolExtension `
+              -disableLink:ContentExtension `
+              -disableLink:CertificateExtension `
+              -allowUntrusted `
+              -skip:Directory="\\App_Data" `
+              -verbose
             
             if ($LASTEXITCODE -eq 0) {
               Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
