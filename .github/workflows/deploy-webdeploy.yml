@@ -710,7 +710,7 @@ jobs:
         $pfxPath = ".\.github\workflows\key\origin.pfx"
         $pfxPassword = $env:PFX_PASSWORD
         $environment = "${{ inputs.environment || 'production' }}"
-        $hostname = if ($environment -eq "staging") { "staging.phongmx.org" } elseif ($environment -eq "development") { "dev.phongmx.org" } else { "phongmx.org" }
+        $hostname =  "phongmx.org"
         $siteName = "${{ env.IIS_SITE_NAME }}"
         
         if (-not (Test-Path $pfxPath)) {
