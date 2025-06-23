@@ -46,7 +46,7 @@ env:
 jobs:
   build-and-deploy:
     name: Build and Deploy using Web Deploy
-    runs-on: [self-hosted, new-self-host]
+    runs-on: [self-hosted, old-runner]
     environment: ${{ inputs.environment || 'production' }}
     
     # Set environment variables based on deployment target
