@@ -837,51 +837,25 @@ jobs:
           }
         }
         
-        # Check if SSL is already properly configured
-        Write-Host "Checking if SSL is already configured for '$hostname'..."
-        $sslAlreadyConfigured = $false
+        # Quick SSL validation with early exit optimization
+        Write-Host "Checking if SSL is already configured for '$hostname'..." -ForegroundColor Cyan
         
+        # Fast certificate binding check
+        $sslAlreadyConfigured = $false
         try {
-          # Check if HTTPS binding exists and certificate is properly assigned
-          $existingHttpsBinding = $null
-          if ($env:USE_APPCMD -eq "true") {
-            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-            $siteInfo = & $appcmdPath list site "$siteName" 2>$null
-            $sslAlreadyConfigured = $siteInfo -and $siteInfo -match "https.*:443:$hostname"
-          } else {
-            try {
-              Import-Module WebAdministration -ErrorAction SilentlyContinue
-              $existingHttpsBinding = Get-WebBinding -Name $siteName -Port 443 -Protocol "https" -ErrorAction SilentlyContinue | 
-                                     Where-Object { $_.bindingInformation -like "*:443:$hostname" }
-              $sslAlreadyConfigured = $existingHttpsBinding -ne $null
-            } catch {
-              $sslAlreadyConfigured = $false
-            }
-          }
-          
-          if ($sslAlreadyConfigured) {
-            # Also check if certificate is properly bound
-            $certBindingExists = $false
-            try {
-              $certCheck = netsh http show sslcert hostnameport="$hostname`:443" 2>$null
-              $certBindingExists = $LASTEXITCODE -eq 0 -and $certCheck -match $thumbprint
-            } catch {
-              $certBindingExists = $false
-            }
-            
-            if ($certBindingExists) {
-              Write-Host "[INFO] SSL certificate is already properly configured for '$hostname'. Skipping SSL configuration." -ForegroundColor Green
-              return
-            } else {
-              Write-Host "[INFO] HTTPS binding exists but certificate assignment needs updating." -ForegroundColor Yellow
-            }
-          } else {
-            Write-Host "[INFO] HTTPS binding not found. Proceeding with SSL configuration." -ForegroundColor Yellow
+          $certCheck = netsh http show sslcert hostnameport="$hostname`:443" 2>$null
+          if ($LASTEXITCODE -eq 0 -and $certCheck -match $thumbprint) {
+            $sslAlreadyConfigured = $true
+            Write-Host "[INFO] SSL certificate is already properly configured for '$hostname'. Skipping SSL configuration." -ForegroundColor Green
           }
         } catch {
-          Write-Warning "Could not check existing SSL configuration: $($_.Exception.Message)"
-          Write-Host "Proceeding with SSL configuration as precaution."
+          # Continue with SSL configuration
         }
+        
+        if ($sslAlreadyConfigured) {
+          Write-Host "[SKIPPED] SSL configuration not needed - certificate already bound correctly" -ForegroundColor Green
+        } else {
+          Write-Host "[INFO] SSL configuration required. Proceeding with certificate binding..." -ForegroundColor Yellow
         
         try {
           # Certificate and thumbprint are already set above
@@ -1096,6 +1070,8 @@ jobs:
           Write-Warning "SSL certificate configuration failed, but continuing with deployment. HTTPS may not be available."
           # Don't throw here to allow deployment to continue without SSL
         }
+        
+        } # End SSL configuration if block
 
     # ================================
     # APPLICATION DEPLOYMENT
@@ -1159,50 +1135,57 @@ jobs:
           icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
         }
         
-        # Method 1: Try package deployment if package exists
-        if ((Test-Path $packagePath) -and ($method -eq "auto" -or $method -eq "package")) {
-          Write-Host "Attempting package deployment..."
-          $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
-          
+        # Direct folder synchronization with proper IIS app pool management
+        Write-Host "Using optimized folder synchronization..." -ForegroundColor Cyan
+        # Stop IIS app pool and site before file operations
+        Write-Host "Stopping IIS App Pool and Site to prevent file locks..." -ForegroundColor Yellow
+        try {
+          if ($env:USE_APPCMD -eq "true") {
+            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+            & $appcmdPath stop apppool "$env:IIS_APP_POOL" 2>$null
+            & $appcmdPath stop site "$siteName" 2>$null
+          } else {
+            Import-Module WebAdministration -ErrorAction SilentlyContinue
+            Stop-WebAppPool -Name "$env:IIS_APP_POOL" -ErrorAction SilentlyContinue
+            Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+          }
+          Write-Host "[SUCCESS] IIS services stopped" -ForegroundColor Green
+          Start-Sleep -Seconds 3
+        } catch {
+          Write-Warning "Could not stop IIS services: $($_.Exception.Message)"
+        }
+        
+        # Take application offline with custom message
+        Write-Host "Taking application offline..." -ForegroundColor Yellow
+        "App is being updated. Please wait..." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
+        Start-Sleep -Seconds 1
+        
+        # Copy files with retry logic
+        Write-Host "Copying application files..." -ForegroundColor Yellow
+        $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
+        $copyAttempts = 0
+        $maxCopyAttempts = 3
+        $copySuccess = $false
+        
+        while ($copyAttempts -lt $maxCopyAttempts -and !$copySuccess) {
           try {
-            & "$msdeployPath" `
-              -verb:sync `
-              -source:package="$absolutePackagePath" `
-              -dest:iisApp="$siteName",computerName=localhost `
-              -setParamFile:"$setParamFile" `
-              -enableRule:AppOffline `
-              -enableRule:DoNotDeleteRule `
-              -allowUntrusted:true `
-              -verbose 2>&1 | Out-String -Stream | ForEach-Object { Write-Host $_ }
-              
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "[SUCCESS] Package deployment completed successfully" -ForegroundColor Green
-              $deploymentSuccess = $true
-            } else {
-              Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE"
-              Write-Host "Package deployment details:" -ForegroundColor Yellow
-              Write-Host "- Package path: $absolutePackagePath"
-              Write-Host "- Site name: $siteName"
-              Write-Host "- Parameter file: $setParamFile"
-              Write-Warning "Attempting folder sync as fallback."
-            }
+            $copyAttempts++
+            Write-Host "Copy attempt $copyAttempts of $maxCopyAttempts..."
+            Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force -ErrorAction Stop
+            $copySuccess = $true
+            Write-Host "[SUCCESS] Files copied successfully" -ForegroundColor Green
           } catch {
-            Write-Warning "[WARNING] Package deployment failed with exception: $($_.Exception.Message)"
-            Write-Warning "Attempting folder sync as fallback."
+            Write-Warning "Copy attempt $copyAttempts failed: $($_.Exception.Message)"
+            if ($copyAttempts -lt $maxCopyAttempts) {
+              Write-Host "Retrying in 2 seconds..." -ForegroundColor Yellow
+              Start-Sleep -Seconds 2
+            }
           }
         }
         
-        # Method 2: Manual parameter replacement + folder sync
-        if (!$deploymentSuccess) {
-          Write-Host "Attempting folder synchronization with manual parameter replacement..."
-          
-          # Take application offline
-          "App is being updated." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
-          Start-Sleep -Seconds 2
-          
-          # Copy files first
-          $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
-          Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
+        if (!$copySuccess) {
+          throw "Failed to copy files after $maxCopyAttempts attempts"
+        }
           
           # Manual parameter replacement since Web Deploy package isn't working
           Write-Host "Applying parameter replacement to appsettings.json..." -ForegroundColor Yellow
@@ -1244,9 +1227,28 @@ jobs:
             Write-Warning "appsettings.json not found in target directory"
           }
           
-          # Remove app_offline.htm
+          # Start IIS services back up
+          Write-Host "Starting IIS App Pool and Site..." -ForegroundColor Yellow
+          try {
+            if ($env:USE_APPCMD -eq "true") {
+              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+              & $appcmdPath start apppool "$env:IIS_APP_POOL"
+              & $appcmdPath start site "$siteName"
+            } else {
+              Import-Module WebAdministration -ErrorAction SilentlyContinue
+              Start-WebAppPool -Name "$env:IIS_APP_POOL"
+              Start-Website -Name "$siteName"
+            }
+            Write-Host "[SUCCESS] IIS services started" -ForegroundColor Green
+          } catch {
+            Write-Warning "Could not start IIS services: $($_.Exception.Message)"
+          }
+          
+          # Remove app_offline.htm to bring application online
+          Write-Host "Bringing application online..." -ForegroundColor Yellow
           if (Test-Path "$targetPath\app_offline.htm") {
             Remove-Item "$targetPath\app_offline.htm" -Force
+            Write-Host "[SUCCESS] Application is now online" -ForegroundColor Green
           }
           
           # Verify parameter replacement worked
@@ -1272,59 +1274,8 @@ jobs:
             }
           }
           
-          Write-Host "[SUCCESS] Folder synchronization with parameter replacement completed"
+          Write-Host "[SUCCESS] Optimized folder deployment completed" -ForegroundColor Green
           $deploymentSuccess = $true
-        }
-        
-        # Method 3: Fallback to simple file copy
-        if (!$deploymentSuccess) {
-          Write-Host "Web Deploy methods failed, falling back to file copy..."
-          
-          # Stop IIS services
-          if ($env:USE_APPCMD -eq "true") {
-            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-            & $appcmdPath stop apppool "${{ env.IIS_APP_POOL }}"
-            & $appcmdPath stop site "$siteName"
-            Start-Sleep -Seconds 3
-          } else {
-            try {
-              Import-Module WebAdministration -ErrorAction Stop
-              Stop-WebAppPool -Name "${{ env.IIS_APP_POOL }}" -ErrorAction SilentlyContinue
-              Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
-              Start-Sleep -Seconds 3
-            } catch {
-              Write-Warning "Could not use WebAdministration module, falling back to appcmd for stop operations"
-              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-              & $appcmdPath stop apppool "${{ env.IIS_APP_POOL }}"
-              & $appcmdPath stop site "$siteName"
-              Start-Sleep -Seconds 3
-            }
-          }
-          
-          # Copy files
-          $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
-          Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force
-          
-          # Start IIS services
-          if ($env:USE_APPCMD -eq "true") {
-            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-            & $appcmdPath start apppool "${{ env.IIS_APP_POOL }}"
-            & $appcmdPath start site "$siteName"
-          } else {
-            try {
-              Start-WebAppPool -Name "${{ env.IIS_APP_POOL }}"
-              Start-Website -Name "$siteName"
-            } catch {
-              Write-Warning "Could not use WebAdministration module, falling back to appcmd for start operations"
-              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-              & $appcmdPath start apppool "${{ env.IIS_APP_POOL }}"
-              & $appcmdPath start site "$siteName"
-            }
-          }
-          
-          Write-Host "[SUCCESS] Fallback file copy deployment completed"
-          $deploymentSuccess = $true
-        }
         
         if ($deploymentSuccess) {
           Write-Host "[SUCCESS] Application deployment completed successfully" -ForegroundColor Green
