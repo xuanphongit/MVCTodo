@@ -45,6 +45,10 @@ jobs:
       with:
         fetch-depth: 0 # Get full history for better change detection
 
+    - name: Set MSDEPLOY_PATH
+      run: echo "MSDEPLOY_PATH=C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" >> $env:GITHUB_ENV
+      shell: powershell
+
     - name: Restore dependencies
       shell: powershell
       run: |
