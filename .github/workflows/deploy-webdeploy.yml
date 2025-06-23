@@ -6,29 +6,11 @@ on:
       - master
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Deployment Environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-        - production
-        - staging
-        - development
       force_deploy:
         description: 'Force deployment (skip health checks)'
         required: false
         default: false
         type: boolean
-      web_deploy_method:
-        description: 'Web Deploy Method'
-        required: true
-        default: 'auto'
-        type: choice
-        options:
-        - auto
-        - package
-        - folder
       skip_tests:
         description: 'Skip running tests'
         required: false
@@ -47,13 +29,13 @@ jobs:
   build-and-deploy:
     name: Build and Deploy using Web Deploy
     runs-on: [self-hosted, old-runner]
-    environment: ${{ inputs.environment || 'production' }}
+    environment: production
     
-    # Set environment variables based on deployment target
+    # Set environment variables for production deployment
     env:
-      IIS_SITE_NAME: ${{ inputs.environment == 'staging' && 'TodoMVCApp-Staging' || inputs.environment == 'development' && 'TodoMVCApp-Dev' || 'TodoMVCApp' }}
-      IIS_APP_POOL: ${{ inputs.environment == 'staging' && 'TodoMVCAppPool-Staging' || inputs.environment == 'development' && 'TodoMVCAppPool-Dev' || 'TodoMVCAppPool' }}
-      IIS_SITE_PATH: ${{ inputs.environment == 'staging' && 'C:\inetpub\wwwroot\TodoApp-Staging' || inputs.environment == 'development' && 'C:\inetpub\wwwroot\TodoApp-Dev' || 'C:\inetpub\wwwroot\TodoApp' }}
+      IIS_SITE_NAME: 'TodoMVCApp'
+      IIS_APP_POOL: 'TodoMVCAppPool'
+      IIS_SITE_PATH: 'C:\inetpub\wwwroot\TodoApp'
       BACKUP_PATH: 'C:\Deployments\Backups'
       PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
     
@@ -76,8 +58,8 @@ jobs:
         Write-Host "Workflow: ${{ github.workflow }}"
         Write-Host "Branch: ${{ github.ref_name }}"
         Write-Host "Commit: ${{ github.sha }}"
-        Write-Host "Environment: ${{ inputs.environment || 'production' }}"
-        Write-Host "Web Deploy Method: ${{ inputs.web_deploy_method || 'auto' }}"
+        Write-Host "Environment: production"
+        Write-Host "Web Deploy Method: package"
         Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
         Write-Host "IIS Site: ${{ env.IIS_SITE_NAME }}"
         Write-Host "IIS Path: ${{ env.IIS_SITE_PATH }}"
@@ -358,24 +340,6 @@ jobs:
           Write-Host "Will attempt to use existing certificate from certificate store" -ForegroundColor Yellow
           echo "SSL_CERT_IMPORTED=false" >> $env:GITHUB_ENV
         }
-        
-        # Check what certificates are available in the certificate store
-        Write-Host ""
-        Write-Host "Available certificates in LocalMachine\My store:" -ForegroundColor Cyan
-        try {
-          $allCerts = Get-ChildItem -Path "Cert:\LocalMachine\My"
-          foreach ($certItem in $allCerts) {
-            $dnsNames = if ($certItem.DnsNameList) { $certItem.DnsNameList -join ', ' } else { "None" }
-            Write-Host "  Subject: $($certItem.Subject)" -ForegroundColor White
-            Write-Host "  Thumbprint: $($certItem.Thumbprint)" -ForegroundColor Gray
-            Write-Host "  DNS Names: $dnsNames" -ForegroundColor Gray
-            Write-Host "  Expires: $($certItem.NotAfter)" -ForegroundColor Gray
-            Write-Host ""
-          }
-        } catch {
-          Write-Warning "Could not list certificates: $($_.Exception.Message)"
-        }
-
     # ================================
     # IIS SITE AND APPLICATION POOL SETUP
     # ================================
@@ -561,25 +525,14 @@ jobs:
             & $appcmdPath set site $siteName /[path='/'].physicalPath:$sitePath
             & $appcmdPath set site $siteName /applicationDefaults.applicationPool:$appPoolName
             } else {
-              Write-Host "Creating new Website: $siteName using appcmd..."
-              & $appcmdPath add site /name:$siteName /physicalPath:$sitePath /bindings:http/*:80:
+              Write-Host "Creating new Website: $siteName using appcmd (HTTPS only)..."
+              & $appcmdPath add site /name:$siteName /physicalPath:$sitePath
               & $appcmdPath set site $siteName /applicationDefaults.applicationPool:$appPoolName
             }
             
             # Configure Website Bindings using appcmd
-            Write-Host "Configuring website bindings using appcmd..."
-            
-            # Additional environment-specific bindings
-            $environment = "${{ inputs.environment || 'production' }}"
-            if ($environment -eq "production") {
-              # Production: Add domain-specific HTTP binding
-              Write-Host "Adding production HTTP binding for phongmx.org..."
-              & $appcmdPath set site $siteName "/+bindings.[protocol='http',bindingInformation='*:80:phongmx.org']"
-            } elseif ($environment -eq "staging") {
-              # Staging: Add staging subdomain binding
-              Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
-              & $appcmdPath set site $siteName "/+bindings.[protocol='http',bindingInformation='*:80:staging.phongmx.org']"
-            }
+            Write-Host "Configuring website bindings using appcmd - HTTPS only..."
+            Write-Host "HTTP bindings are disabled - HTTPS only configuration"
             
             # Start the website
             & $appcmdPath start site $siteName
@@ -614,34 +567,13 @@ jobs:
               Set-ItemProperty -Path "IIS:\Sites\$siteName" -Name "applicationPool" -Value $appPoolName
               
             } else {
-              Write-Host "Creating new Website: $siteName"
-              New-Website -Name $siteName -PhysicalPath $sitePath -ApplicationPool $appPoolName
+              Write-Host "Creating new Website: $siteName (HTTPS only)"
+              New-Website -Name $siteName -PhysicalPath $sitePath -ApplicationPool $appPoolName -Port 443 -Protocol "https"
             }
             
             # Configure Website Bindings (WebAdministration style)
-            Write-Host "Configuring website bindings..."
-            
-            # HTTP Binding (Port 80)
-            if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -ErrorAction SilentlyContinue)) {
-              Write-Host "Adding HTTP binding (Port 80)..."
-              New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http"
-            }
-            
-            # Additional environment-specific bindings
-            $environment = "${{ inputs.environment || 'production' }}"
-            if ($environment -eq "production") {
-              # Production: Add domain-specific HTTP binding
-              if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "phongmx.org" -ErrorAction SilentlyContinue)) {
-                Write-Host "Adding production HTTP binding for phongmx.org..."
-                New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "phongmx.org"
-              }
-            } elseif ($environment -eq "staging") {
-              # Staging: Add staging subdomain binding
-              if (-not (Get-WebBinding -Name $siteName -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org" -ErrorAction SilentlyContinue)) {
-                Write-Host "Adding staging HTTP binding for staging.phongmx.org..."
-                New-WebBinding -Name $siteName -IPAddress "*" -Port 80 -Protocol "http" -HostHeader "staging.phongmx.org"
-              }
-            }
+            Write-Host "Configuring website bindings - HTTPS only..."
+            Write-Host "HTTP bindings are disabled - HTTPS only configuration"
             
             # Website configuration
             Write-Host "Applying website configuration..."
@@ -739,7 +671,6 @@ jobs:
       run: |
         Write-Host "=== BINDING SSL CERTIFICATE TO IIS ===" -ForegroundColor Yellow
         
-        $environment = "${{ inputs.environment || 'production' }}"
         $hostname = "phongmx.org"
         $siteName = "${{ env.IIS_SITE_NAME }}"
         
@@ -1043,15 +974,15 @@ jobs:
         $targetPath = "${{ env.IIS_SITE_PATH }}"
         $packageDir = if (Test-Path "${{ env.PACKAGE_PATH }}") { Resolve-Path "${{ env.PACKAGE_PATH }}" | Select-Object -ExpandProperty Path } else { "${{ env.PACKAGE_PATH }}" }
         $packagePath = Join-Path $packageDir "TodoApp.zip"
-        $method = "${{ inputs.web_deploy_method || 'auto' }}"
-        $environment = "${{ inputs.environment || 'production' }}"
+        $method = "package"
+        $environment = "production"
         
         # Try to find setParameters file in multiple locations
         $setParamFile = $null
         $possiblePaths = @(
-          "parameters/setParameters.$environment.xml",
+          "parameters/setParameters.production.xml",
           "parameters/setParameters.xml",
-          "$sourcePath/parameters/setParameters.$environment.xml",
+          "$sourcePath/parameters/setParameters.production.xml",
           "$sourcePath/parameters/setParameters.xml"
         )
         
@@ -1086,100 +1017,88 @@ jobs:
           icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
         }
         
-        # Direct folder synchronization with proper IIS app pool management
-        Write-Host "Using optimized folder synchronization..." -ForegroundColor Cyan
-        # Stop IIS app pool and site before file operations
-        Write-Host "Stopping IIS App Pool and Site to prevent file locks..." -ForegroundColor Yellow
+        # Use Web Deploy package method with setParamFile for proper parameter replacement
+        Write-Host "Using Web Deploy package deployment with parameter file..." -ForegroundColor Cyan
+        
+        # Verify package exists
+        if (!(Test-Path $packagePath)) {
+          throw "Web Deploy package not found: $packagePath"
+        }
+        
+        # Verify setParameters file exists
+        if (!$setParamFile -or !(Test-Path $setParamFile)) {
+          throw "setParameters file not found. Required for Web Deploy package deployment."
+        }
+        
+        Write-Host "Package: $packagePath" -ForegroundColor Green
+        Write-Host "Parameters: $setParamFile" -ForegroundColor Green
+        
         try {
-          if ($env:USE_APPCMD -eq "true") {
-            $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
-            & $appcmdPath stop apppool "$env:IIS_APP_POOL" 2>$null
-            & $appcmdPath stop site "$siteName" 2>$null
+          Write-Host "Deploying Web Deploy package with parameter replacement..." -ForegroundColor Yellow
+          
+          # Convert paths to absolute for Web Deploy
+          $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
+          $absoluteSetParamPath = Resolve-Path $setParamFile | Select-Object -ExpandProperty Path
+          
+          # Build Web Deploy command arguments
+          $msdeployArgs = @(
+            "-source:package=`"$absolutePackagePath`"",
+            "-dest:auto,computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
+            "-verb:sync",
+            "-disableLink:AppPoolExtension",
+            "-disableLink:ContentExtension", 
+            "-disableLink:CertificateExtension",
+            "-setParamFile:`"$absoluteSetParamPath`"",
+            "-allowUntrusted",
+            "-skip:Directory=`"\\App_Data`"",
+            "-verbose"
+          )
+          
+          Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
+          Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
+          
+          # Execute Web Deploy
+          & $msdeployPath @msdeployArgs
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
+            $deploymentSuccess = $true
           } else {
-            Import-Module WebAdministration -ErrorAction SilentlyContinue
-            Stop-WebAppPool -Name "$env:IIS_APP_POOL" -ErrorAction SilentlyContinue
-            Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+            Write-Error "Web Deploy failed with exit code: $LASTEXITCODE"
+            throw "Web Deploy package deployment failed"
           }
-          Write-Host "[SUCCESS] IIS services stopped" -ForegroundColor Green
-          Start-Sleep -Seconds 3
+          
         } catch {
-          Write-Warning "Could not stop IIS services: $($_.Exception.Message)"
-        }
-        
-        # Take application offline with custom message
-        Write-Host "Taking application offline..." -ForegroundColor Yellow
-        "App is being updated. Please wait..." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
-        Start-Sleep -Seconds 1
-        
-        # Copy files with retry logic
-        Write-Host "Copying application files..." -ForegroundColor Yellow
-        $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
-        $copyAttempts = 0
-        $maxCopyAttempts = 3
-        $copySuccess = $false
-        
-        while ($copyAttempts -lt $maxCopyAttempts -and !$copySuccess) {
+          Write-Error "Package deployment failed: $($_.Exception.Message)"
+          Write-Host "Attempting fallback deployment method..." -ForegroundColor Yellow
+          
+          # Fallback to folder sync if package deployment fails
+          Write-Host "Using folder synchronization as fallback..." -ForegroundColor Yellow
+          
+          # Stop IIS services
           try {
-            $copyAttempts++
-            Write-Host "Copy attempt $copyAttempts of $maxCopyAttempts..."
-            Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force -ErrorAction Stop
-            $copySuccess = $true
-            Write-Host "[SUCCESS] Files copied successfully" -ForegroundColor Green
-          } catch {
-            Write-Warning "Copy attempt $copyAttempts failed: $($_.Exception.Message)"
-            if ($copyAttempts -lt $maxCopyAttempts) {
-              Write-Host "Retrying in 2 seconds..." -ForegroundColor Yellow
-              Start-Sleep -Seconds 2
-            }
-          }
-        }
-        
-        if (!$copySuccess) {
-          throw "Failed to copy files after $maxCopyAttempts attempts"
-        }
-          
-          # Manual parameter replacement since Web Deploy package isn't working
-          Write-Host "Applying parameter replacement to appsettings.json..." -ForegroundColor Yellow
-          $appsettingsPath = Join-Path $targetPath "appsettings.json"
-          if (Test-Path $appsettingsPath) {
-            $appsettingsContent = Get-Content $appsettingsPath -Raw
-            
-            # Load parameter values from setParameters file
-            if ($setParamFile -and (Test-Path $setParamFile)) {
-              [xml]$setParams = Get-Content $setParamFile
-              foreach ($param in $setParams.parameters.setParameter) {
-                $paramName = $param.name
-                $paramValue = $param.value
-                
-                # Map parameter names to placeholders
-                $placeholder = switch ($paramName) {
-                  "Authentication-DefaultCredentials-Username" { "{{USERNAME_PLACEHOLDER}}" }
-                  "Authentication-DefaultCredentials-Password" { "{{PASSWORD_PLACEHOLDER}}" }
-                  "Logging-LogLevel-Default" { "{{LOGLEVEL_PLACEHOLDER}}" }
-                  "Application-Domain" { "{{DOMAIN_PLACEHOLDER}}" }
-                  "Application-UseSSL" { "{{SSL_PLACEHOLDER}}" }
-                  "DefaultConnection" { "{{CONNECTION_PLACEHOLDER}}" }
-                  default { $null }
-                }
-                
-                if ($placeholder) {
-                  $appsettingsContent = $appsettingsContent -replace [regex]::Escape($placeholder), $paramValue
-                  Write-Host "Replaced $placeholder with $paramValue"
-                }
-              }
-              
-              # Save updated appsettings.json
-              $appsettingsContent | Out-File -FilePath $appsettingsPath -Encoding UTF8 -Force
-              Write-Host "[SUCCESS] Parameter replacement completed" -ForegroundColor Green
+            if ($env:USE_APPCMD -eq "true") {
+              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+              & $appcmdPath stop apppool "$env:IIS_APP_POOL" 2>$null
+              & $appcmdPath stop site "$siteName" 2>$null
             } else {
-              Write-Warning "setParameters file not found, skipping parameter replacement"
+              Import-Module WebAdministration -ErrorAction SilentlyContinue
+              Stop-WebAppPool -Name "$env:IIS_APP_POOL" -ErrorAction SilentlyContinue
+              Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
             }
-          } else {
-            Write-Warning "appsettings.json not found in target directory"
+            Start-Sleep -Seconds 3
+          } catch {
+            Write-Warning "Could not stop IIS services: $($_.Exception.Message)"
           }
           
-          # Start IIS services back up
-          Write-Host "Starting IIS App Pool and Site..." -ForegroundColor Yellow
+          # Take application offline
+          "App is being updated. Please wait..." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
+          
+          # Copy files
+          $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
+          Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force -ErrorAction Stop
+          
+          # Start IIS services
           try {
             if ($env:USE_APPCMD -eq "true") {
               $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
@@ -1190,43 +1109,18 @@ jobs:
               Start-WebAppPool -Name "$env:IIS_APP_POOL"
               Start-Website -Name "$siteName"
             }
-            Write-Host "[SUCCESS] IIS services started" -ForegroundColor Green
           } catch {
             Write-Warning "Could not start IIS services: $($_.Exception.Message)"
           }
           
-          # Remove app_offline.htm to bring application online
-          Write-Host "Bringing application online..." -ForegroundColor Yellow
+          # Remove app_offline.htm
           if (Test-Path "$targetPath\app_offline.htm") {
             Remove-Item "$targetPath\app_offline.htm" -Force
-            Write-Host "[SUCCESS] Application is now online" -ForegroundColor Green
           }
           
-          # Verify parameter replacement worked
-          $appsettingsPath = Join-Path $targetPath "appsettings.json"
-          if (Test-Path $appsettingsPath) {
-            Write-Host "=== VERIFYING PARAMETER REPLACEMENT ===" -ForegroundColor Cyan
-            $content = Get-Content $appsettingsPath -Raw
-            
-            # Check if any placeholders remain
-            $remainingPlaceholders = @()
-            @("{{USERNAME_PLACEHOLDER}}", "{{PASSWORD_PLACEHOLDER}}", "{{LOGLEVEL_PLACEHOLDER}}", "{{DOMAIN_PLACEHOLDER}}", "{{SSL_PLACEHOLDER}}", "{{CONNECTION_PLACEHOLDER}}") | ForEach-Object {
-              if ($content -match [regex]::Escape($_)) {
-                $remainingPlaceholders += $_
-              }
-            }
-            
-            if ($remainingPlaceholders.Count -gt 0) {
-              Write-Warning "The following placeholders were not replaced: $($remainingPlaceholders -join ', ')"
-              Write-Host "Current appsettings.json content:" -ForegroundColor Yellow
-              Write-Host $content
-            } else {
-              Write-Host "[SUCCESS] All placeholders have been replaced successfully" -ForegroundColor Green
-            }
-          }
-          
-          Write-Host "[SUCCESS] Optimized folder deployment completed" -ForegroundColor Green
+          Write-Host "[SUCCESS] Fallback folder deployment completed" -ForegroundColor Green
           $deploymentSuccess = $true
+        }
         
         if ($deploymentSuccess) {
           Write-Host "[SUCCESS] Application deployment completed successfully" -ForegroundColor Green
