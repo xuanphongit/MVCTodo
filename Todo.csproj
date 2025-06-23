@@ -39,7 +39,7 @@
   <ItemGroup><!-- Core runtime dependencies only, no development/scaffolding packages -->
     <!-- Add production packages here as needed -->
   
-    <None Update="Parameters.xml">
+    <None Update="parameters.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
