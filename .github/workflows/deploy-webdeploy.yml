@@ -742,13 +742,28 @@ jobs:
               # Ignore if binding doesn't exist
             }
             
+            # Also remove any existing SSL certificate binding
+            Write-Host "Removing existing SSL certificate binding if it exists..."
+            try {
+              netsh http delete sslcert hostnameport="$hostname`:443" 2>$null
+              netsh http delete sslcert ipport="0.0.0.0:443" 2>$null
+            } catch {
+              # Ignore if certificate binding doesn't exist
+            }
+            
             # Create new HTTPS binding
             Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName' using appcmd..."
             & $appcmdPath set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:443:$hostname"]
             
             # Assign certificate using netsh (since appcmd doesn't handle SSL cert assignment directly)
             Write-Host "Assigning SSL certificate using netsh..."
-            netsh http add sslcert hostnameport="$hostname`:443" certhash=$thumbprint appid="{$([System.Guid]::NewGuid().ToString())}" certstorename=MY
+            $appId = "{$([System.Guid]::NewGuid().ToString())}"
+            netsh http add sslcert hostnameport="$hostname`:443" certhash=$thumbprint appid=$appId certstorename=MY
+            
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Host-based SSL binding failed, trying IP-based binding as fallback"
+              netsh http add sslcert ipport="0.0.0.0:443" certhash=$thumbprint appid=$appId certstorename=MY
+            }
             
             Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using appcmd." -ForegroundColor Green
             
@@ -758,21 +773,73 @@ jobs:
               Import-Module WebAdministration -ErrorAction Stop
             }
             
-            # Get existing binding
-            $existingBinding = Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" -ErrorAction SilentlyContinue
+            # Get existing binding (handle parameter compatibility)
+            $existingBinding = $null
+            try {
+              $existingBinding = Get-WebBinding -Name $siteName -Port 443 -Protocol "https" -ErrorAction SilentlyContinue | 
+                                Where-Object { $_.bindingInformation -like "*:443:$hostname" }
+            } catch {
+              Write-Warning "Could not check for existing bindings: $($_.Exception.Message)"
+            }
             
             if ($existingBinding) {
               Write-Host "Found existing HTTPS binding for '$hostname'. Removing it before creating a new one."
-              $existingBinding | Remove-WebBinding
+              try {
+                $existingBinding | Remove-WebBinding
+              } catch {
+                Write-Warning "Could not remove existing binding using WebAdministration: $($_.Exception.Message)"
+              }
             }
             
-            # Create new binding
+            # Also remove any existing SSL certificate binding
+            Write-Host "Removing existing SSL certificate binding if it exists..."
+            try {
+              netsh http delete sslcert hostnameport="$hostname`:443" 2>$null
+              netsh http delete sslcert ipport="0.0.0.0:443" 2>$null
+            } catch {
+              # Ignore if certificate binding doesn't exist
+            }
+            
+            # Create new binding with proper parameter handling
             Write-Host "Creating new HTTPS binding for '$hostname' on site '$siteName'..."
-            New-WebBinding -Name $siteName -IPAddress "*" -Port 443 -HostName $hostname -Protocol "https" -SslFlags 1
+            try {
+              # Try with HostHeader parameter (newer versions)
+              New-WebBinding -Name $siteName -IPAddress "*" -Port 443 -HostHeader $hostname -Protocol "https" -SslFlags 1
+            } catch {
+              try {
+                # Try without HostHeader for older versions
+                Write-Warning "HostHeader parameter failed, trying alternative approach: $($_.Exception.Message)"
+                New-WebBinding -Name $siteName -IPAddress "*" -Port 443 -Protocol "https"
+              } catch {
+                Write-Warning "New-WebBinding failed, using appcmd as fallback: $($_.Exception.Message)"
+                $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+                & $appcmdPath set site "$siteName" /+bindings.[protocol='https',bindingInformation="*:443:$hostname"]
+              }
+            }
             
             # Assign certificate to the binding
-            Get-WebBinding -Name $siteName -HostName $hostname -Port 443 -Protocol "https" | ForEach-Object {
-              $_.AddSslCertificate($thumbprint, "my")
+            try {
+              $binding = Get-WebBinding -Name $siteName -Port 443 -Protocol "https" -ErrorAction Stop
+              if ($binding) {
+                $binding.AddSslCertificate($thumbprint, "my")
+              } else {
+                throw "Could not find HTTPS binding to assign certificate"
+              }
+            } catch {
+              Write-Warning "WebAdministration certificate assignment failed: $($_.Exception.Message)"
+              Write-Host "Using netsh to assign SSL certificate..."
+              
+              # Use netsh as fallback for certificate assignment
+              $appId = "{$([System.Guid]::NewGuid().ToString())}"
+              netsh http add sslcert hostnameport="$hostname`:443" certhash=$thumbprint appid=$appId certstorename=MY
+              
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "[SUCCESS] SSL certificate assigned using netsh" -ForegroundColor Green
+              } else {
+                # Try IP-based binding as final fallback
+                Write-Warning "Host-based SSL binding failed, trying IP-based binding"
+                netsh http add sslcert ipport="0.0.0.0:443" certhash=$thumbprint appid=$appId certstorename=MY
+              }
             }
             
             Write-Host "[SUCCESS] Successfully configured SSL binding for '$hostname' on port 443 using WebAdministration." -ForegroundColor Green
