@@ -1041,7 +1041,6 @@ jobs:
           $absoluteSetParamPath = Resolve-Path $setParamFile | Select-Object -ExpandProperty Path
           
           # Build Web Deploy command arguments for local IIS deployment
-          # Try IIS app deployment first, then fallback to contentPath if needed
           $msdeployArgs = @(
             "-source:package=`"$absolutePackagePath`"",
             "-dest:contentPath=`"$targetPath`",computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
@@ -1078,15 +1077,18 @@ jobs:
             if ($deployedFiles -and $deployedFiles.Count -gt 0) {
               Write-Host "Found $($deployedFiles.Count) files in target directory" -ForegroundColor Green
               Write-Host "Key files:" -ForegroundColor Cyan
-              @("Todo.dll", "Todo.exe", "appsettings.json", "web.config") | ForEach-Object {
-                $file = Join-Path $targetPath $_
+              
+              $keyFiles = @("Todo.dll", "Todo.exe", "appsettings.json", "web.config")
+              foreach ($fileName in $keyFiles) {
+                $file = Join-Path $targetPath $fileName
                 if (Test-Path $file) {
                   $fileInfo = Get-Item $file
-                  Write-Host "  ✓ $_ ($(Get-Date $fileInfo.LastWriteTime -Format 'yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Green
+                  Write-Host "  ✓ $fileName ($(Get-Date $fileInfo.LastWriteTime -Format 'yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Green
                 } else {
-                  Write-Host "  ✗ $_ (missing)" -ForegroundColor Red
+                  Write-Host "  ✗ $fileName (missing)" -ForegroundColor Red
                 }
               }
+              
               $deploymentSuccess = $true
             } else {
               Write-Warning "No files found in target directory after deployment!"
@@ -1153,12 +1155,9 @@ jobs:
         
         if ($deploymentSuccess) {
           Write-Host "[SUCCESS] Application deployment completed successfully" -ForegroundColor Green
-          
-          # Reset any previous error conditions since deployment ultimately succeeded
           $global:LASTEXITCODE = 0
           $Error.Clear()
           exit 0
-          
         } else {
           Write-Error "All deployment methods failed."
           Write-Host "Deployment troubleshooting information:" -ForegroundColor Yellow
@@ -1166,6 +1165,10 @@ jobs:
           Write-Host "- Target path: $targetPath (exists: $(Test-Path $targetPath))" 
           Write-Host "- Package path: $packagePath (exists: $(Test-Path $packagePath))"
           Write-Host "- MSDeploy path: $msdeployPath (exists: $(Test-Path $msdeployPath))"
-          Write-Host "- Parameter file: $setParamFile (exists: $(if($setParamFile){Test-Path $setParamFile}else{'N/A'}))"
+          if ($setParamFile) {
+            Write-Host "- Parameter file: $setParamFile (exists: $(Test-Path $setParamFile))"
+          } else {
+            Write-Host "- Parameter file: N/A"
+          }
           throw "All deployment methods failed"
         }
