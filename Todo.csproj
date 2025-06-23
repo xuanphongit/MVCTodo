@@ -13,7 +13,7 @@
 
   <!-- Web Deploy Parameters -->
   <ItemGroup>
-    <MsDeployParameterFile Include="Parameters.xml" />
+    <MsDeployParameterFile Include="parameters.xml" />
   </ItemGroup>
 
   <!-- Include setParameters files in build output -->
