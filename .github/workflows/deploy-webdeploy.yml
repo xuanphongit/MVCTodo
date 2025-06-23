@@ -424,59 +424,6 @@ jobs:
           $useAppcmd = $true
         }
         
-        try {
-          # Try importing WebAdministration module
-          Import-Module WebAdministration -Force -ErrorAction Stop
-          
-          # Test if cmdlets are actually available
-          $testCmdlet = Get-Command "Get-WebAppPool" -ErrorAction SilentlyContinue
-          if ($testCmdlet) {
-            Write-Host "[SUCCESS] WebAdministration module imported and cmdlets available" -ForegroundColor Green
-            $webAdminAvailable = $true
-          } else {
-            Write-Warning "WebAdministration module imported but cmdlets not available"
-            throw "WebAdministration cmdlets not available"
-          }
-          
-        } catch {
-          Write-Warning "WebAdministration module issue: $($_.Exception.Message)"
-          
-          if ($useAppcmd) {
-            Write-Host "[INFO] Falling back to appcmd.exe for IIS management" -ForegroundColor Yellow
-            $env:USE_APPCMD = "true"
-          } else {
-            Write-Warning "Attempting to install IIS Management Tools..."
-            
-            # Install IIS Management Tools if not available
-            try {
-              Write-Host "Installing IIS Management features..."
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart -ErrorAction SilentlyContinue
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart -ErrorAction SilentlyContinue
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart -ErrorAction SilentlyContinue
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-IIS6ManagementCompatibility -All -NoRestart -ErrorAction SilentlyContinue
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-Metabase -All -NoRestart -ErrorAction SilentlyContinue
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-WMICompatibility -All -NoRestart -ErrorAction SilentlyContinue
-              Enable-WindowsOptionalFeature -Online -FeatureName IIS-LegacyScripts -All -NoRestart -ErrorAction SilentlyContinue
-              
-              Write-Host "Waiting for feature installation to complete..."
-              Start-Sleep -Seconds 5
-              
-              # Re-check for appcmd after installation
-              if (Test-Path $appcmdPath) {
-                Write-Host "[SUCCESS] appcmd.exe now available after IIS installation" -ForegroundColor Green
-                $env:USE_APPCMD = "true"
-                $useAppcmd = $true
-              } else {
-                throw "IIS installation failed - appcmd.exe still not available"
-              }
-              
-            } catch {
-              Write-Error "Failed to install IIS features: $($_.Exception.Message)"
-              throw "Neither WebAdministration module nor appcmd.exe is available. IIS management tools are required."
-            }
-          }
-        }
-        
         # Set the management method to use
         if ($webAdminAvailable) {
           Write-Host "[INFO] Will use WebAdministration PowerShell module" -ForegroundColor Cyan
@@ -1080,9 +1027,6 @@ jobs:
         $global:LASTEXITCODE = 0
         Write-Host "[COMPLETED] SSL configuration step finished" -ForegroundColor Green
 
-    # ================================
-    # APPLICATION DEPLOYMENT
-    # ================================
     - name: Deploy Application
       shell: powershell
       timeout-minutes: 15
@@ -1302,81 +1246,3 @@ jobs:
           Write-Host "- Parameter file: $setParamFile (exists: $(if($setParamFile){Test-Path $setParamFile}else{'N/A'}))"
           throw "All deployment methods failed."
         }
-
-    - name: Deployment Summary and Cleanup
-      if: always()
-      shell: powershell
-      run: |
-        Write-Host "=== DEPLOYMENT SUMMARY ===" -ForegroundColor Cyan
-        
-        $endTime = Get-Date
-        # Calculate deployment duration from job start (approximate)
-        $deploymentDuration = 0
-        try {
-          $workflowStartTime = [DateTime]::Parse("${{ github.event.head_commit.timestamp }}")
-          $deploymentDuration = ($endTime - $workflowStartTime).TotalMinutes
-        } catch {
-          $deploymentDuration = 0
-        }
-        $environment = "${{ inputs.environment || 'production' }}"
-        $success = $env:GITHUB_JOB_STATUS -eq 'success'
-        
-        Write-Host ""
-        Write-Host "Deployment Metrics:" -ForegroundColor White
-        Write-Host "  Environment: $environment"
-        Write-Host "  Status: $(if($success){'SUCCESS'}else{'FAILED'})"
-        Write-Host "  Duration: $([math]::Round($deploymentDuration, 2)) minutes"
-        Write-Host "  Method: ${{ inputs.web_deploy_method || 'auto' }}"
-        Write-Host "  Branch: ${{ github.ref_name }}"
-        Write-Host "  Commit: ${{ github.sha }}"
-        Write-Host "  Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')"
-        
-        Write-Host ""
-        Write-Host "Deployment Details:" -ForegroundColor White
-        Write-Host "  IIS Site: ${{ env.IIS_SITE_NAME }}"
-        Write-Host "  App Pool: ${{ env.IIS_APP_POOL }}"
-        Write-Host "  Deploy Path: ${{ env.IIS_SITE_PATH }}"
-        Write-Host "  Backup Path: ${{ env.BACKUP_PATH }}"
-        
-        # Show deployed files info if deployment succeeded
-        if (Test-Path "${{ env.IIS_SITE_PATH }}") {
-          try {
-            $files = Get-ChildItem -Path "${{ env.IIS_SITE_PATH }}" -Recurse -File -ErrorAction SilentlyContinue
-            $totalSize = ($files | Measure-Object -Property Length -Sum).Sum
-            Write-Host "  Deployed Files: $($files.Count)"
-            Write-Host "  Total Size: $([math]::Round($totalSize / 1MB, 2)) MB"
-          } catch {
-            Write-Warning "Could not get deployment file statistics"
-          }
-        }
-        
-        Write-Host ""
-        if ($success) {
-          Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
-          Write-Host ""
-          Write-Host "Next Steps:" -ForegroundColor Yellow
-          Write-Host "  - Verify application functionality at https://phongmx.org"
-          Write-Host "  - Monitor application logs"
-        } else {
-          Write-Host "DEPLOYMENT FAILED!" -ForegroundColor Red
-          Write-Host ""
-          Write-Host "Troubleshooting Resources:" -ForegroundColor Yellow
-          Write-Host "  - Check GitHub Actions logs above"
-          Write-Host "  - Review Windows Event Logs"
-          Write-Host "  - Verify IIS configuration"
-          
-          # Show rollback information
-          $latestBackup = Get-ChildItem -Path "${{ env.BACKUP_PATH }}" -Directory -ErrorAction SilentlyContinue | 
-                         Sort-Object CreationTime -Descending | 
-                         Select-Object -First 1
-          
-          if ($latestBackup) {
-            Write-Host ""
-            Write-Host "Rollback Available:" -ForegroundColor Cyan
-            Write-Host "  Latest backup: $($latestBackup.Name)"
-            Write-Host "  To rollback: Copy contents from $($latestBackup.FullName) to ${{ env.IIS_SITE_PATH }}"
-          }
-        }
-        
-        Write-Host ""
-        Write-Host "===============================================" -ForegroundColor Cyan
