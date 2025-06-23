@@ -734,13 +734,57 @@ jobs:
         $siteName = "${{ env.IIS_SITE_NAME }}"
         
         if (-not (Test-Path $pfxPath)) {
-          Write-Warning "SSL certificate not found at '$pfxPath'. Skipping SSL configuration."
-          exit 0
-        }
-        
-        if (-not $pfxPassword) {
-          Write-Warning "PFX_PASSWORD secret is not set. Skipping SSL configuration."
-          exit 0
+          Write-Warning "SSL certificate file not found at '$pfxPath'."
+          Write-Host "Attempting to use existing certificate from certificate store..." -ForegroundColor Yellow
+          
+          # Try to find existing certificate that can be used
+          $existingCert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { 
+            $_.Subject -like "*$hostname*" -or $_.Subject -like "*localhost*" 
+          } | Select-Object -First 1
+          
+          if ($existingCert) {
+            $cert = $existingCert
+            $thumbprint = $cert.Thumbprint
+            Write-Host "[INFO] Found existing certificate: $thumbprint" -ForegroundColor Green
+            Write-Host "Subject: $($cert.Subject)" -ForegroundColor Cyan
+            Write-Host "Expires: $($cert.NotAfter)" -ForegroundColor Cyan
+            if ($cert.Subject -like "*localhost*") {
+              Write-Warning "Using localhost certificate - browsers will show security warnings for $hostname"
+            }
+          } else {
+            Write-Warning "No suitable certificate found in certificate store. Skipping SSL configuration."
+            Write-Host "To fix this: Run .\fix-ssl-certificate.ps1 as Administrator after deployment" -ForegroundColor Yellow
+            exit 0
+          }
+        } else {
+          if (-not $pfxPassword) {
+            Write-Warning "PFX_PASSWORD secret is not set. Skipping SSL configuration."
+            exit 0
+          }
+          
+          # Import certificate from PFX file
+          try {
+            $passwordSecure = ConvertTo-SecureString -String $pfxPassword -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\LocalMachine\My" -Password $passwordSecure
+            $thumbprint = $cert.Thumbprint
+            Write-Host "[SUCCESS] Imported SSL certificate from PFX: $thumbprint" -ForegroundColor Green
+          } catch {
+            Write-Error "Failed to import PFX certificate: $($_.Exception.Message)"
+            Write-Host "Attempting to use existing certificate from certificate store..." -ForegroundColor Yellow
+            
+            $existingCert = Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { 
+              $_.Subject -like "*$hostname*" -or $_.Subject -like "*localhost*" 
+            } | Select-Object -First 1
+            
+            if ($existingCert) {
+              $cert = $existingCert
+              $thumbprint = $cert.Thumbprint
+              Write-Host "[FALLBACK] Using existing certificate: $thumbprint" -ForegroundColor Yellow
+            } else {
+              Write-Warning "No suitable certificate found. Skipping SSL configuration."
+              exit 0
+            }
+          }
         }
         
         # Check if SSL is already properly configured
@@ -790,12 +834,8 @@ jobs:
         }
         
         try {
-          # Import certificate
-          $passwordSecure = ConvertTo-SecureString -String $pfxPassword -AsPlainText -Force
-          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation "Cert:\LocalMachine\My" -Password $passwordSecure
-          $thumbprint = $cert.Thumbprint
-          
-          Write-Host "[SUCCESS] Imported SSL certificate for '$hostname' with thumbprint: $thumbprint" -ForegroundColor Green
+          # Certificate and thumbprint are already set above
+          Write-Host "[SUCCESS] Using SSL certificate for '$hostname' with thumbprint: $thumbprint" -ForegroundColor Green
           
           if ($env:USE_APPCMD -eq "true") {
             $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
