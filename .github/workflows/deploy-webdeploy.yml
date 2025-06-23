@@ -995,12 +995,126 @@ jobs:
           # Use Web Deploy package method with setParamFile for proper parameter replacement
           Write-Host "Using Web Deploy package deployment with parameter file..." -ForegroundColor Cyan
 
-          # Verify package exists
-          if (!(Test-Path $packagePath)) {
-            throw "Web Deploy package not found: $packagePath"
-          }
 
-          # Verify setParameters file exists
-          if (!$setParamFile -or !(Test-Path $setParamFile)) {
-            throw "setParameters file not found. Required for Web Deploy package deployment."
+
+          try {
+          Write-Host "Deploying Web Deploy package with parameter replacement..." -ForegroundColor Yellow
+          
+          # Convert paths to absolute for Web Deploy
+          $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
+          $absoluteSetParamPath = Resolve-Path $setParamFile | Select-Object -ExpandProperty Path
+          
+          # Build Web Deploy command arguments for local IIS deployment
+          $msdeployArgs = @(
+            "-source:package=`"$absolutePackagePath`"",
+            "-dest:contentPath=`"$targetPath`",computerName=`"localhost`",authtype=`"NTLM`",includeAcls=`"False`"",
+            "-verb:sync",
+            "-disableLink:AppPoolExtension",
+            "-disableLink:ContentExtension", 
+            "-disableLink:CertificateExtension",
+            "-setParamFile:`"$absoluteSetParamPath`"",
+            "-allowUntrusted",
+            "-skip:Directory=`"\\App_Data`"",
+            "-verbose"
+          )
+          
+          Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
+          Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
+          
+          # Verify target directory exists and is accessible
+          Write-Host "Verifying target directory: $targetPath" -ForegroundColor Yellow
+          if (!(Test-Path $targetPath)) {
+            Write-Host "Creating target directory: $targetPath" -ForegroundColor Yellow
+            New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+            icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T /Q | Out-Null
           }
+          
+          # Execute Web Deploy
+          & $msdeployPath @msdeployArgs
+          
+
+
+
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
+            
+            # Verify files were actually deployed to target directory
+            Write-Host "Verifying deployment to target directory: $targetPath" -ForegroundColor Yellow
+            $deployedFiles = Get-ChildItem -Path $targetPath -Recurse -File -ErrorAction SilentlyContinue
+            if ($deployedFiles -and $deployedFiles.Count -gt 0) {
+              Write-Host "Found $($deployedFiles.Count) files in target directory" -ForegroundColor Green
+              Write-Host "Key files:" -ForegroundColor Cyan
+              $keyFiles = @("Todo.dll", "Todo.exe", "appsettings.json", "web.config")
+              foreach ($fileName in $keyFiles) {
+                $file = Join-Path $targetPath $fileName
+                if (Test-Path $file) {
+                  $fileInfo = Get-Item $file
+                  Write-Host "  ✓ $fileName ($(Get-Date $fileInfo.LastWriteTime -Format 'yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Green
+                } else {
+                  Write-Host "  ✗ $fileName (missing)" -ForegroundColor Red
+                }
+              }
+              $deploymentSuccess = $true
+            } else {
+              Write-Warning "No files found in target directory after deployment!"
+              throw "Deployment verification failed - target directory is empty"
+            }
+          } else {
+            Write-Error "Web Deploy failed with exit code: $LASTEXITCODE"
+            throw "Web Deploy package deployment failed"
+          }
+          
+        } catch {
+          Write-Error "Package deployment failed: $($_.Exception.Message)"
+          Write-Host "Attempting fallback deployment method..." -ForegroundColor Yellow
+          
+          # Fallback to folder sync if package deployment fails
+          Write-Host "Using folder synchronization as fallback..." -ForegroundColor Yellow
+          
+          # Stop IIS services
+          try {
+            if ($env:USE_APPCMD -eq "true") {
+              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+              & $appcmdPath stop apppool "$env:IIS_APP_POOL" 2>$null
+              & $appcmdPath stop site "$siteName" 2>$null
+            } else {
+              Import-Module WebAdministration -ErrorAction SilentlyContinue
+              Stop-WebAppPool -Name "$env:IIS_APP_POOL" -ErrorAction SilentlyContinue
+              Stop-Website -Name "$siteName" -ErrorAction SilentlyContinue
+            }
+            Start-Sleep -Seconds 3
+          } catch {
+            Write-Warning "Could not stop IIS services: $($_.Exception.Message)"
+          }
+          
+          # Take application offline
+          "App is being updated. Please wait..." | Out-File -FilePath "$targetPath\app_offline.htm" -Encoding UTF8 -Force
+          
+          # Copy files
+          $absoluteSourcePath = Resolve-Path $sourcePath | Select-Object -ExpandProperty Path
+          Copy-Item -Path "$absoluteSourcePath\*" -Destination "$targetPath" -Recurse -Force -ErrorAction Stop
+          
+          # Start IIS services
+          try {
+            if ($env:USE_APPCMD -eq "true") {
+              $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+              & $appcmdPath start apppool "$env:IIS_APP_POOL"
+              & $appcmdPath start site "$siteName"
+            } else {
+              Import-Module WebAdministration -ErrorAction SilentlyContinue
+              Start-WebAppPool -Name "$env:IIS_APP_POOL"
+              Start-Website -Name "$siteName"
+            }
+          } catch {
+            Write-Warning "Could not start IIS services: $($_.Exception.Message)"
+          }
+          
+          # Remove app_offline.htm
+          if (Test-Path "$targetPath\app_offline.htm") {
+            Remove-Item "$targetPath\app_offline.htm" -Force
+          }
+          
+          Write-Host "[SUCCESS] Fallback folder deployment completed" -ForegroundColor Green
+          $deploymentSuccess = $true
+        }
