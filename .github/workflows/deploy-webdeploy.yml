@@ -897,6 +897,15 @@ jobs:
           Write-Host "Using environment-specific parameter file: $setParamFile"
         }
         
+        # Debug deployment configuration
+        Write-Host "Deployment configuration:" -ForegroundColor Cyan
+        Write-Host "- Method: $method"
+        Write-Host "- Environment: $environment"
+        Write-Host "- Source: $sourcePath (exists: $(Test-Path $sourcePath))"
+        Write-Host "- Target: $targetPath (exists: $(Test-Path $targetPath))"
+        Write-Host "- Package: $packagePath (exists: $(Test-Path $packagePath))"
+        Write-Host "- Parameter file: $setParamFile (exists: $(Test-Path $setParamFile))"
+        
         # Verify source and target directories
         if (!(Test-Path $sourcePath)) {
           throw "Source path does not exist: $sourcePath"
@@ -926,7 +935,12 @@ jobs:
             Write-Host "[SUCCESS] Package deployment completed successfully"
             $deploymentSuccess = $true
           } else {
-            Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE. Attempting folder sync."
+            Write-Warning "[WARNING] Package deployment failed with exit code: $LASTEXITCODE"
+            Write-Host "Package deployment details:" -ForegroundColor Yellow
+            Write-Host "- Package path: $absolutePackagePath"
+            Write-Host "- Site name: $siteName"
+            Write-Host "- Parameter file: $setParamFile"
+            Write-Warning "Attempting folder sync as fallback."
           }
         }
         
@@ -961,7 +975,12 @@ jobs:
             Write-Host "[SUCCESS] Folder synchronization completed successfully"
             $deploymentSuccess = $true
           } else {
-            Write-Warning "[WARNING] Folder sync failed with exit code: $LASTEXITCODE. Attempting file copy."
+            Write-Warning "[WARNING] Folder sync failed with exit code: $LASTEXITCODE"
+            Write-Host "Folder sync details:" -ForegroundColor Yellow
+            Write-Host "- Source path: $absoluteSourcePath"
+            Write-Host "- Target path: $targetPath"
+            Write-Host "- MSDeploy path: $msdeployPath"
+            Write-Warning "Attempting file copy as final fallback."
           }
         }
         
@@ -1018,6 +1037,13 @@ jobs:
         if ($deploymentSuccess) {
           Write-Host "[SUCCESS] Application deployment completed successfully" -ForegroundColor Green
         } else {
+          Write-Error "All deployment methods failed."
+          Write-Host "Deployment troubleshooting information:" -ForegroundColor Yellow
+          Write-Host "- Source path: $sourcePath (exists: $(Test-Path $sourcePath))"
+          Write-Host "- Target path: $targetPath (exists: $(Test-Path $targetPath))" 
+          Write-Host "- Package path: $packagePath (exists: $(Test-Path $packagePath))"
+          Write-Host "- MSDeploy path: $msdeployPath (exists: $(Test-Path $msdeployPath))"
+          Write-Host "- Parameter file: $setParamFile (exists: $(Test-Path $setParamFile))"
           throw "All deployment methods failed."
         }
 
