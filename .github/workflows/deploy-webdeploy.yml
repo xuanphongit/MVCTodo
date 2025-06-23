@@ -45,9 +45,65 @@ jobs:
       with:
         fetch-depth: 0 # Get full history for better change detection
 
-    - name: Set MSDEPLOY_PATH
-      run: echo "MSDEPLOY_PATH=C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" >> $env:GITHUB_ENV
+    - name: Install Web Deploy (if not present)
       shell: powershell
+      run: |
+        Write-Host "=== CHECKING WEB DEPLOY INSTALLATION ===" -ForegroundColor Yellow
+        
+        $msdeployPaths = @(
+          "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe",
+          "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe",
+          "${env:ProgramFiles}\IIS\Microsoft Web Deploy V4\msdeploy.exe",
+          "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V4\msdeploy.exe"
+        )
+        
+        $msdeployFound = $false
+        foreach ($path in $msdeployPaths) {
+          if (Test-Path $path) {
+            Write-Host "Found Web Deploy at: $path" -ForegroundColor Green
+            echo "MSDEPLOY_PATH=$path" >> $env:GITHUB_ENV
+            $msdeployFound = $true
+            break
+          }
+        }
+        
+        if (-not $msdeployFound) {
+          Write-Host "Web Deploy not found, installing..." -ForegroundColor Yellow
+          try {
+            # Download and install Web Deploy using chocolatey if available
+            if (Get-Command choco -ErrorAction SilentlyContinue) {
+              Write-Host "Installing Web Deploy via Chocolatey..."
+              choco install webdeploy -y --force
+            } else {
+              # Direct download method
+              Write-Host "Downloading Web Deploy manually..."
+              $webdeployUrl = "https://download.microsoft.com/download/0/1/D/01DC28EA-638C-4A22-A57B-4CEF97755C6C/WebDeploy_amd64_en-US.msi"
+              $tempFile = "$env:TEMP\webdeploy.msi"
+              Invoke-WebRequest -Uri $webdeployUrl -OutFile $tempFile
+              Write-Host "Installing Web Deploy..."
+              Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $tempFile, "/quiet", "/norestart" -Wait
+              Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            }
+            
+            # Verify installation
+            Start-Sleep -Seconds 10
+            foreach ($path in $msdeployPaths) {
+              if (Test-Path $path) {
+                Write-Host "Web Deploy installed successfully at: $path" -ForegroundColor Green
+                echo "MSDEPLOY_PATH=$path" >> $env:GITHUB_ENV
+                $msdeployFound = $true
+                break
+              }
+            }
+            
+            if (-not $msdeployFound) {
+              throw "Web Deploy installation failed"
+            }
+          } catch {
+            Write-Error "Failed to install Web Deploy: $($_.Exception.Message)"
+            throw "Web Deploy installation required but failed"
+          }
+        }
 
     - name: Restore dependencies
       shell: powershell
@@ -167,26 +223,47 @@ jobs:
       run: |
         Write-Host "=== CREATING WEB DEPLOY PACKAGE ===" -ForegroundColor Yellow
         
+        # Auto-discover msdeploy.exe if not set
         $msdeployPath = $env:MSDEPLOY_PATH
         if (!$msdeployPath) {
-          Write-Warning "MSDeploy path not set - skipping package creation"
-          exit 0
+          Write-Host "MSDEPLOY_PATH not set, searching for msdeploy.exe..." -ForegroundColor Yellow
+          
+          $searchPaths = @(
+            "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe",
+            "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V3\msdeploy.exe",
+            "${env:ProgramFiles}\IIS\Microsoft Web Deploy V4\msdeploy.exe",
+            "${env:ProgramFiles(x86)}\IIS\Microsoft Web Deploy V4\msdeploy.exe"
+          )
+          
+          foreach ($path in $searchPaths) {
+            if (Test-Path $path) {
+              $msdeployPath = $path
+              Write-Host "Found msdeploy.exe at: $msdeployPath" -ForegroundColor Green
+              break
+            }
+          }
+        }
+        
+        if (!$msdeployPath -or !(Test-Path $msdeployPath)) {
+          Write-Error "msdeploy.exe not found! Please install Web Deploy or set MSDEPLOY_PATH."
+          throw "Web Deploy (msdeploy.exe) is required to create package"
         }
         
         # Create package directory
         New-Item -ItemType Directory -Path ${{ env.PACKAGE_PATH }} -Force | Out-Null
         
         try {
-          Write-Host "Creating Web Deploy package..."
+          Write-Host "Creating Web Deploy package..." -ForegroundColor Cyan
+          Write-Host "Using msdeploy.exe: $msdeployPath" -ForegroundColor Gray
           
           # Convert relative paths to absolute paths for Web Deploy
           $absoluteSourcePath = Resolve-Path "${{ env.PUBLISH_PATH }}" | Select-Object -ExpandProperty Path
           $packageDir = Resolve-Path "${{ env.PACKAGE_PATH }}" | Select-Object -ExpandProperty Path
           $absolutePackagePath = Join-Path $packageDir "TodoApp.zip"
           
-          Write-Host "Source path: $absoluteSourcePath"
-          Write-Host "Package directory: $packageDir"
-          Write-Host "Package path: $absolutePackagePath"
+          Write-Host "Source path: $absoluteSourcePath" -ForegroundColor Gray
+          Write-Host "Package directory: $packageDir" -ForegroundColor Gray
+          Write-Host "Package path: $absolutePackagePath" -ForegroundColor Gray
           
           # Create package without parameter validation during creation
           & "$msdeployPath" `
@@ -203,13 +280,24 @@ jobs:
             Write-Host "[SUCCESS] Web Deploy package created successfully" -ForegroundColor Green
             Write-Host "Package size: $([math]::Round($packageInfo.Length / 1MB, 2)) MB"
             Write-Host "Package location: $($packageInfo.FullName)"
+            
+            # Set environment variable for later steps
+            echo "PACKAGE_CREATED=true" >> $env:GITHUB_ENV
+            echo "PACKAGE_PATH_FULL=$absolutePackagePath" >> $env:GITHUB_ENV
           } else {
-            Write-Warning "Package creation failed - will use folder deployment"
+            throw "Package creation failed - msdeploy returned exit code: $LASTEXITCODE"
           }
         } catch {
-          Write-Warning "Package creation failed: $($_.Exception.Message)"
-          Write-Host "Continuing with folder-based deployment as fallback"
+          Write-Error "Package creation failed: $($_.Exception.Message)"
+          throw "Failed to create Web Deploy package"
         }
+
+    - name: Upload Web Deploy package
+      uses: actions/upload-artifact@v4
+      with:
+        name: webdeploy-package
+        path: ${{ env.PACKAGE_PATH }}/TodoApp.zip
+      if: success()
 
     # ================================
     # SSL CERTIFICATE IMPORT
@@ -879,6 +967,8 @@ jobs:
     - name: Deploy Application
       shell: powershell
       run: |
+          Write-Host "=== DEPLOYING APPLICATION ===" -ForegroundColor Yellow
+          
           $deploymentSuccess = $false
           $msdeployPath = $env:MSDEPLOY_PATH
           $siteName = "${{ env.IIS_SITE_NAME }}"
@@ -891,6 +981,7 @@ jobs:
 
           # Try to find setParameters file in multiple locations
           $setParamFile = "parameters/setParameters.xml"
+          
           # Debug deployment configuration
           Write-Host "Deployment configuration:" -ForegroundColor Cyan
           Write-Host "- Method: $method"
@@ -899,20 +990,33 @@ jobs:
           Write-Host "- Target: $targetPath (exists: $(Test-Path $targetPath))"
           Write-Host "- Package: $packagePath (exists: $(Test-Path $packagePath))"
           Write-Host "- Parameter file: $setParamFile (exists: $(Test-Path $setParamFile))"
+          Write-Host "- msdeploy path: $msdeployPath (exists: $(Test-Path $msdeployPath))"
 
-          # Verify source and target directories
+          # Verify prerequisites
           if (!(Test-Path $sourcePath)) {
             throw "Source path does not exist: $sourcePath"
           }
+          
+          if (!(Test-Path $packagePath)) {
+            throw "Web Deploy package does not exist: $packagePath. Package creation must have failed."
+          }
+          
+          if (!(Test-Path $setParamFile)) {
+            throw "setParameters file does not exist: $setParamFile. This file is required for parameter replacement."
+          }
+          
+          if (!(Test-Path $msdeployPath)) {
+            throw "msdeploy.exe not found at: $msdeployPath"
+          }
+          
+          # Ensure target directory exists
           if (!(Test-Path $targetPath)) {
-            Write-Host "Target directory does not exist, creating: ${targetPath}"
+            Write-Host "Target directory does not exist, creating: ${targetPath}" -ForegroundColor Yellow
             New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
             icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
           }
 
-          # Use Web Deploy package method with setParamFile for proper parameter replacement
-          Write-Host "Using Web Deploy package deployment with parameter file..." -ForegroundColor Cyan
-
+          Write-Host "Using Web Deploy package deployment with parameter replacement..." -ForegroundColor Cyan
 
           try {
             Write-Host "Deploying Web Deploy package with parameter replacement..." -ForegroundColor Yellow
@@ -920,6 +1024,9 @@ jobs:
             # Convert paths to absolute for Web Deploy
             $absolutePackagePath = Resolve-Path $packagePath | Select-Object -ExpandProperty Path
             $absoluteSetParamPath = Resolve-Path $setParamFile | Select-Object -ExpandProperty Path
+            
+            Write-Host "Absolute package path: $absolutePackagePath" -ForegroundColor Gray
+            Write-Host "Absolute setParam path: $absoluteSetParamPath" -ForegroundColor Gray
             
             # Build Web Deploy command arguments for local IIS deployment
             $msdeployArgs = @(
@@ -938,16 +1045,40 @@ jobs:
             Write-Host "Executing Web Deploy command:" -ForegroundColor Cyan
             Write-Host "$msdeployPath $($msdeployArgs -join ' ')" -ForegroundColor Gray
             
-            # Verify target directory exists and is accessible
-            Write-Host "Verifying target directory: $targetPath" -ForegroundColor Yellow
-            if (!(Test-Path $targetPath)) {
-              Write-Host "Creating target directory: $targetPath" -ForegroundColor Yellow
-              New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
-              icacls $targetPath /grant "IIS_IUSRS:(OI)(CI)F" /T /Q | Out-Null
+            # Execute Web Deploy
+            & $msdeployPath @msdeployArgs
+            
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "[SUCCESS] Web Deploy package deployment completed successfully" -ForegroundColor Green
+              $deploymentSuccess = $true
+              
+              # Verify deployment by checking for key files
+              $webConfigPath = Join-Path $targetPath "web.config"
+              if (Test-Path $webConfigPath) {
+                Write-Host "[SUCCESS] web.config found at target location" -ForegroundColor Green
+                
+                # Show first few lines of web.config to verify parameter replacement
+                Write-Host "Checking web.config content for parameter replacement..." -ForegroundColor Cyan
+                $webConfigContent = Get-Content $webConfigPath -Head 20
+                Write-Host "First 20 lines of deployed web.config:" -ForegroundColor Gray
+                $webConfigContent | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+              } else {
+                Write-Warning "web.config not found at target location after deployment"
+              }
+            } else {
+              throw "Web Deploy failed with exit code: $LASTEXITCODE"
             }
             
-            & $msdeployPath @msdeployArgs
           } catch {
-
-           }
+            Write-Error "Deployment failed: $($_.Exception.Message)"
+            Write-Host "Deployment error details:" -ForegroundColor Red
+            Write-Host $_.Exception.ToString() -ForegroundColor Red
+            throw "Web Deploy package deployment failed"
+          }
+          
+          if (-not $deploymentSuccess) {
+            throw "Deployment was not successful"
+          }
+          
+          Write-Host "[COMPLETED] Application deployment finished successfully" -ForegroundColor Green
           
